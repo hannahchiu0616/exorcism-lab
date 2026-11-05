@@ -78,6 +78,8 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 .seal { flex: none; width: 40px; height: 40px; display: grid; place-items: center; border: 1.5px dashed var(--line); border-radius: 3px; font-family: var(--display); font-weight: 900; font-size: 22px; color: transparent; }
 .prac[aria-checked="true"] .seal { background: var(--cinnabar); border: 0; color: var(--on-cinnabar); transform: rotate(-7deg); }
 .prac[aria-checked="true"] .prac-text b { color: var(--muted); }
+.prac.locked { background: var(--bg); }
+.prac.locked .seal { background: var(--muted); color: var(--bg); transform: none; font-family: var(--body); font-size: 20px; }
 .stamp .seal { animation: stamp .24s ease-out; }
 @keyframes stamp { from { transform: scale(1.7) rotate(-14deg); opacity: .3; } to { transform: scale(1) rotate(-7deg); opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .stamp .seal { animation: none; } }
@@ -525,20 +527,20 @@ textarea.short { min-height: 76px; }
       : h("div", { class: "remain clear" }, h("b", null, `${word}的訂課全部完成`)));
     const allPicked = list.every((p) => picked[p.id]);
     g.append(h("div", { class: "pracs" }, list.map((p) => {
-      const isDone = !!picked[p.id];
+      const locked = !!saved[p.id], isDone = !!picked[p.id];
       return h("button", {
-        class: "prac" + (S.justStamped === p.id && isDone ? " stamp" : ""),
+        class: "prac" + (locked ? " locked" : S.justStamped === p.id && isDone ? " stamp" : ""),
         type: "button", role: "checkbox", "aria-checked": String(isDone), "data-pid": p.id,
-        on: { click: () => toggle(p.id) },
+        disabled: locked, on: { click: () => toggle(p.id) },
       },
-        h("span", { class: "seal", "aria-hidden": "true" }, "成"),
-        h("span", { class: "prac-text" }, h("b", null, p.name), p.note ? h("small", null, p.note) : null));
+        h("span", { class: "seal", "aria-hidden": "true" }, locked ? "✓" : "成"),
+        h("span", { class: "prac-text" }, h("b", null, p.name), p.note ? h("small", null, p.note) : null, locked ? h("small", null, "已打卡") : null));
     })));
     const changed = !sameDone(picked, saved);
     g.append(h("div", { class: "actions submit-row" },
       h("button", { class: "primary", id: "checkin-submit", type: "button", disabled: !changed || S.saving, on: { click: submitCheckin } },
         S.saving ? "打卡中……" : changed || !Object.keys(saved).length ? "打卡" : "已打卡"),
-      h("button", { class: "ghost", type: "button", on: { click: () => setAll(!allPicked) } }, allPicked ? "全部取消" : "全部勾選")));
+      left.length ? h("button", { class: "ghost", type: "button", on: { click: () => setAll(!allPicked) } }, allPicked ? "全部取消" : "全部勾選") : null));
     if (focusId) { const el = g.querySelector(`[data-pid="${focusId}"]`); if (el) el.focus(); }
     S.justStamped = null;
   }
@@ -642,7 +644,7 @@ textarea.short { min-height: 76px; }
 
   /* ---- actions ---- */
   /* ticks stay on this device until the 打卡 button saves them */
-  const draftOf = (date) => S.drafts[date] || doneMap(date);
+  const draftOf = (date) => ({ ...doneMap(date), ...(S.drafts[date] || {}) });
   const sameDone = (a, b) => JSON.stringify(Object.keys(a).sort()) === JSON.stringify(Object.keys(b).sort());
   function toggle(pid) {
     const date = S.selDate, next = clone(draftOf(date));
@@ -652,7 +654,10 @@ textarea.short { min-height: 76px; }
   }
   function setAll(on) {
     const date = S.selDate, next = clone(draftOf(date));
-    for (const p of activeOn(date)) { if (on) next[p.id] = true; else delete next[p.id]; }
+    for (const p of activeOn(date)) {
+      if (doneMap(date)[p.id]) continue; /* saved check-ins stay locked */
+      if (on) next[p.id] = true; else delete next[p.id];
+    }
     S.drafts[date] = next;
     render();
   }
