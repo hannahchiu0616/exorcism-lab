@@ -357,6 +357,7 @@ textarea.short { min-height: 76px; }
   const WEEK = ["日", "一", "二", "三", "四", "五", "六"];
   const VIEWS = ["checkin", "overview", "journal", "notes", "rules"];
   const PEOPLE = ["邱子芸", "江宇熙"];
+  const DEFAULT_OBSERVERS = ["邱美琪", "張克強"];
   const LOCK_MSG = "這天已鎖定，只能從後台修改。";
   const DEFAULT_DAYS = 21;
   const DEFAULT_RULES = { weekdays: [1, 2, 3, 4, 5], restDays: [], restReasons: {}, text: "只做平日，見紅就休息" };
@@ -561,7 +562,7 @@ textarea.short { min-height: 76px; }
       $("view-" + v).hidden = !on;
     }
   }
-  const observers = () => (S.cfg && S.cfg.observers) || [];
+  const observers = () => (S.cfg && S.cfg.observers) || DEFAULT_OBSERVERS;
   function renderObservers() {
     const list = observers();
     $("observer-list").replaceChildren(...list.map((n) => h("li", null, h("span", null, n),
