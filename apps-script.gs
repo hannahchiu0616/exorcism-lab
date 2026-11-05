@@ -57,7 +57,7 @@ function findRow(sh, key) {
   for (let i = 0; i < col.length; i++) if (String(col[i][0]) === key) return i + 2;
   return 0;
 }
-// 文字格式寫入：內容開頭是 = 也不會被當成公式
+// 文字格式寫入；內容開頭的 = 由網頁端加上單引號，避免被當成公式
 function put(sh, row, values) {
   sh.getRange(row, 1, 1, values.length).setNumberFormat("@").setValues([values.map(String)]);
 }

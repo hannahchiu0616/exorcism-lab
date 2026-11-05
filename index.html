@@ -250,7 +250,7 @@ form { display: grid; gap: 12px; margin: 0; min-width: 0; }
   const VIEWS = ["checkin", "journal", "notes"];
   const DEFAULT_DAYS = 21;
 
-  const API = ""; /* Apps Script 網頁應用程式網址 */
+  const API = "https://script.google.com/macros/s/AKfycbyHMXCObmXzh1VNL9aL0vl6xC8JHrlRmGY83uN88fDpYnO5roRPZfF3bfiQYEmc-ccr/exec"; /* Apps Script 網頁應用程式網址 */
   const ROLE_KEY = "exorcism-lab-role";
   const POLL_MS = 30000;
   const saved = {
@@ -401,6 +401,8 @@ form { display: grid; gap: 12px; margin: 0; min-width: 0; }
     refreshing = false;
   }
   const clone = (o) => JSON.parse(JSON.stringify(o));
+  /* a sheet cell reads a leading = as a formula; a leading ' makes it literal and is not stored */
+  const sheetSafe = (s) => (/^[=']/.test(s) ? "'" + s : s);
   function saveCfg(next) {
     S.cfg = next; render();
     return write("saveConfig", { cfg: next });
@@ -638,7 +640,7 @@ form { display: grid; gap: 12px; margin: 0; min-width: 0; }
     if (!body || !date) return;
     const submit = $("journal-submit");
     submit.disabled = true;
-    const ok = await write("saveJournal", { id: S.editing, date, energy: S.energy, body });
+    const ok = await write("saveJournal", { id: S.editing, date, energy: S.energy, body: sheetSafe(body) });
     submit.disabled = false;
     if (ok) { resetJournal(); toast("已儲存紀錄"); }
   });
@@ -646,7 +648,7 @@ form { display: grid; gap: 12px; margin: 0; min-width: 0; }
     e.preventDefault();
     const body = $("note-body").value.trim();
     if (!body) return;
-    const ok = await write("addNote", { body, role: S.noteRole });
+    const ok = await write("addNote", { body: sheetSafe(body), role: S.noteRole });
     if (ok) { $("note-body").value = ""; toast("留言已送出"); }
   });
 
