@@ -5,10 +5,12 @@
 //   2. 上方函式選 setup → 執行 → 授權
 //   3. 部署 → 新增部署作業 → 網頁應用程式 → 執行身分「我」、存取權「所有人」→ 部署 → 複製網址
 
+const PEOPLE = ["邱子芸", "江宇熙"];
+
 const TABS = {
   "設定": ["項目", "值"],
-  "打卡": ["日期", "完成項目"],
-  "歷程": ["編號", "日期", "能量", "內容", "建立時間", "修改時間"],
+  "打卡": ["日期", "完成項目", "實驗者"],
+  "歷程": ["編號", "日期", "能量", "內容", "建立時間", "修改時間", "實驗者"],
   "留言": ["編號", "內容", "建立時間", "身分"],
 };
 
@@ -41,6 +43,11 @@ function tab(ss, name) {
     sh.getRange(1, 1, 1, TABS[name].length).setValues([TABS[name]]).setFontWeight("bold");
     sh.setFrozenRows(1);
   }
+  const head = TABS[name];
+  // 舊版試算表少了後來新增的欄位，補上標題
+  if (String(sh.getRange(1, head.length).getValue()) !== head[head.length - 1]) {
+    sh.getRange(1, 1, 1, head.length).setValues([head]).setFontWeight("bold");
+  }
   return sh;
 }
 function rows(ss, name) {
@@ -61,6 +68,15 @@ function findRow(sh, key) {
 function put(sh, row, values) {
   sh.getRange(row, 1, 1, values.length).setNumberFormat("@").setValues([values.map(String)]);
 }
+function findCheckin(sh, date, who) {
+  const n = sh.getLastRow();
+  if (n < 2) return 0;
+  const col = sh.getRange(2, 1, n - 1, 3).getValues();
+  for (let i = 0; i < col.length; i++) {
+    if (String(col[i][0]) === date && (String(col[i][2]) || PEOPLE[0]) === who) return i + 2;
+  }
+  return 0;
+}
 function upsert(sh, key, values) {
   put(sh, findRow(sh, key) || sh.getLastRow() + 1, values);
 }
@@ -72,14 +88,19 @@ function removeRow(sh, key) {
 function snapshot(ss) {
   const settings = {};
   rows(ss, "設定").forEach(r => { settings[r[0]] = r[1]; });
-  const checkins = {};
-  rows(ss, "打卡").forEach(r => { checkins[r[0]] = { done: parse(r[1], {}) }; });
+  const by = {};
+  PEOPLE.forEach(name => { by[name] = {}; });
+  rows(ss, "打卡").forEach(r => {
+    const who = r[2] || PEOPLE[0];
+    (by[who] = by[who] || {})[r[0]] = { done: parse(r[1], {}) };
+  });
   return {
     cfg: parse(settings["實驗"], null),
-    checkins: checkins,
+    checkins: by[PEOPLE[0]],
+    checkinsBy: by,
     journal: rows(ss, "歷程").map(r => ({
       id: r[0], date: r[1], energy: r[2] ? Number(r[2]) : null, body: r[3],
-      createdAt: Number(r[4]) || 0, editedAt: Number(r[5]) || 0,
+      createdAt: Number(r[4]) || 0, editedAt: Number(r[5]) || 0, person: r[6] || PEOPLE[0],
     })),
     notes: rows(ss, "留言").map(r => ({ id: r[0], body: r[1], createdAt: Number(r[2]) || 0, role: r[3] })),
   };
@@ -89,6 +110,12 @@ function parse(s, fallback) { try { return JSON.parse(s); } catch (e) { return f
 /* ---------- 檢查 ---------- */
 function appError(code, message) { const e = new Error(message); e.appCode = code; return e; }
 const isDate = s => /^\d{4}-\d{2}-\d{2}$/.test(String(s || ""));
+const person = s => (PEOPLE.indexOf(s) >= 0 ? s : PEOPLE[0]);
+// 打卡期限：隔天中午 12 點（台灣時間，等於隔天的 UTC 04:00）
+function pastDeadline(date) {
+  const [y, m, d] = date.split("-").map(Number);
+  return Date.now() >= Date.UTC(y, m - 1, d + 1, 4);
+}
 function text(s, max) {
   const t = String(s == null ? "" : s).trim().slice(0, max);
   if (!t) throw appError("invalid", "內容不能是空的");
@@ -102,6 +129,7 @@ function cleanCfg(c) {
   const r = c.rules || {};
   return {
     startDate: c.startDate, days: days,
+    observers: (Array.isArray(c.observers) ? c.observers : []).map(n => String(n).trim().slice(0, 20)).filter(Boolean).slice(0, 20),
     rules: {
       weekdays: (Array.isArray(r.weekdays) ? r.weekdays : [1, 2, 3, 4, 5]).map(Number).filter(d => d >= 0 && d <= 6),
       restDays: (Array.isArray(r.restDays) ? r.restDays : []).filter(isDate).slice(0, 366),
@@ -151,19 +179,23 @@ function applyWrite(ss, p) {
       return;
     case "setCheckin":
       if (!isDate(p.date)) throw appError("invalid", "日期不正確");
-      upsert(tab(ss, "打卡"), p.date, [p.date, JSON.stringify(cleanDone(p.done))]);
+      if (pastDeadline(p.date)) throw appError("locked", "這天已鎖定，只能從後台修改。");
+      {
+        const sh = tab(ss, "打卡"), who = person(p.person);
+        put(sh, findCheckin(sh, p.date, who) || sh.getLastRow() + 1, [p.date, JSON.stringify(cleanDone(p.done)), who]);
+      }
       return;
     case "saveJournal": {
       if (!isDate(p.date)) throw appError("invalid", "日期不正確");
-      const sh = tab(ss, "歷程"), body = text(p.body, 5000), now = Date.now();
+      const sh = tab(ss, "歷程"), body = text(p.body, 5000), now = Date.now(), who = person(p.person);
       const energy = [1, 2, 3, 4, 5].indexOf(Number(p.energy)) >= 0 ? Number(p.energy) : "";
       if (p.id) {
         const row = findRow(sh, String(p.id));
         if (!row) throw appError("invalid", "找不到這筆紀錄");
         const created = String(sh.getRange(row, 5).getValue());
-        put(sh, row, [p.id, p.date, energy, body, created, now]);
+        put(sh, row, [p.id, p.date, energy, body, created, now, who]);
       } else {
-        put(sh, sh.getLastRow() + 1, [Utilities.getUuid(), p.date, energy, body, now, ""]);
+        put(sh, sh.getLastRow() + 1, [Utilities.getUuid(), p.date, energy, body, now, "", who]);
       }
       return;
     }
@@ -171,7 +203,7 @@ function applyWrite(ss, p) {
       removeRow(tab(ss, "歷程"), String(p.id));
       return;
     case "addNote": {
-      const sh = tab(ss, "留言"), role = p.role === "experimenter" ? "experimenter" : "observer";
+      const sh = tab(ss, "留言"), role = String(p.role || "observer").slice(0, 20);
       put(sh, sh.getLastRow() + 1, [Utilities.getUuid(), text(p.body, 3000), Date.now(), role]);
       return;
     }
