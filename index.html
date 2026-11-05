@@ -137,12 +137,13 @@ form { display: grid; gap: 12px; margin: 0; min-width: 0; }
 .remain b { font-size: 15px; }
 .remain.clear { background: var(--cinnabar); color: var(--on-cinnabar); }
 .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); }
-.matrix { border-collapse: separate; border-spacing: 0; font-size: 13px; }
-.matrix th, .matrix td { min-width: 44px; padding: 6px 4px; text-align: center; border-bottom: 1px solid var(--line); font-weight: 500; white-space: nowrap; }
+.matrix { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
+.matrix th, .matrix td { min-width: 34px; padding: 6px 2px; text-align: center; border-bottom: 1px solid var(--line); font-weight: 500; white-space: nowrap; }
 .matrix tbody tr:last-child th, .matrix tbody tr:last-child td { border-bottom: 0; }
 .matrix thead th { font-family: var(--mono); font-size: 12px; color: var(--muted); }
 .matrix small { display: block; font-family: var(--body); font-size: 11px; color: var(--muted); font-weight: 400; }
-.matrix .name { position: sticky; left: 0; z-index: 1; min-width: 104px; max-width: 150px; padding-inline: 10px; text-align: left; white-space: normal; background: var(--surface); border-right: 1px solid var(--line); color: var(--ink); font-family: var(--body); }
+.matrix .name { position: sticky; left: 0; z-index: 1; min-width: 84px; max-width: 150px; padding-inline: 8px; text-align: left; white-space: normal; background: var(--surface); border-right: 1px solid var(--line); color: var(--ink); font-family: var(--body); }
+.matrix thead th.now { color: var(--ink); font-weight: 700; }
 .matrix .off { color: var(--muted); background: var(--bg); font-size: 12px; }
 .mark { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 2px; background: var(--cinnabar); color: var(--on-cinnabar); font-family: var(--body); font-weight: 700; font-size: 15px; }
 .miss { color: var(--muted); }
@@ -208,7 +209,11 @@ textarea.short { min-height: 76px; }
     </div>
     <div class="group" id="matrix-group" hidden>
       <h2>每項訂課的打卡紀錄</h2>
-      <p class="muted">最新的日期在最左邊，往右滑看更早的日子。</p>
+      <div class="monthbar">
+        <button class="icon-btn" id="prev-week" type="button" aria-label="上一週">‹</button>
+        <b id="week-label"></b>
+        <button class="icon-btn" id="next-week" type="button" aria-label="下一週">›</button>
+      </div>
       <div class="table-wrap" id="matrix"></div>
     </div>
   </section>
@@ -315,7 +320,7 @@ textarea.short { min-height: 76px; }
   const POLL_MS = 30000;
 
   const S = {
-    loaded: false, drafts: {}, saving: false, month: null,
+    loaded: false, drafts: {}, saving: false, month: null, week: null,
     cfg: null, checkins: {}, journal: [], notes: [],
     view: "checkin", selDate: null, justStamped: null, editing: null, energy: null,
   };
@@ -589,18 +594,28 @@ textarea.short { min-height: 76px; }
       }, String(n)));
     }
     $("days").replaceChildren(...cells);
-    const dates = elapsedDates().reverse();
-    const head = h("tr", null, h("th", { class: "name", scope: "col" }, "訂課"), dates.map((d) => {
-      const [, m, day] = parts(d);
-      return h("th", { scope: "col" }, `${m}/${day}`, h("small", null, `週${WEEK[weekdayOf(d)]}`));
-    }));
+    const weekStart = (d) => addDays(d, -weekdayOf(d));
+    const firstWeek = weekStart(S.cfg.startDate), lastWeek = weekStart(lastDay());
+    if (!S.week) S.week = weekStart(today());
+    if (S.week < firstWeek) S.week = firstWeek;
+    if (S.week > lastWeek) S.week = lastWeek;
+    const week = WEEK.map((_, i) => addDays(S.week, i));
+    const short = (d) => `${parts(d)[1]}/${parts(d)[2]}`;
+    $("week-label").textContent = `${short(week[0])} – ${short(week[6])}`;
+    $("prev-week").disabled = S.week <= firstWeek;
+    $("next-week").disabled = S.week >= lastWeek;
+    const dates = week.filter((d) => started() && d >= S.cfg.startDate && d <= t);
+    const head = h("tr", null, h("th", { class: "name", scope: "col" }, "訂課"), week.map((d) => (
+      h("th", { scope: "col", class: d === today() ? "now" : null }, short(d), h("small", null, `週${WEEK[weekdayOf(d)]}`))
+    )));
     const body = S.cfg.practices.filter((p) => !p.removedOn || dates.some((d) => applies(p, d))).map((p) => {
       const due = dates.filter((d) => applies(p, d) && !restReason(d));
       const n = due.filter((d) => doneMap(d)[p.id]).length;
       const bonus = dates.filter((d) => restReason(d) && applies(p, d) && doneMap(d)[p.id]).length;
       return h("tr", null,
         h("th", { class: "name", scope: "row" }, p.name + (p.removedOn ? "（已移除）" : ""), h("small", null, `${n} / ${due.length} 天` + (bonus ? `，休息日 +${bonus}` : ""))),
-        dates.map((d) => {
+        week.map((d) => {
+          if (!dates.includes(d)) return h("td", null, "");
           if (!applies(p, d)) return h("td", null, "");
           if (doneMap(d)[p.id]) return h("td", { class: restReason(d) ? "off" : null }, h("span", { class: "mark" }, "✓"));
           if (restReason(d)) return h("td", { class: "off" }, "休");
@@ -756,6 +771,9 @@ textarea.short { min-height: 76px; }
     S.month = `${x.getUTCFullYear()}-${pad(x.getUTCMonth() + 1)}`;
     render();
   }
+  function shiftWeek(by) { S.week = addDays(S.week, by * 7); render(); }
+  $("prev-week").addEventListener("click", () => shiftWeek(-1));
+  $("next-week").addEventListener("click", () => shiftWeek(1));
   $("prev-month").addEventListener("click", () => shiftMonth(-1));
   $("next-month").addEventListener("click", () => shiftMonth(1));
   $("prev-day").addEventListener("click", () => { S.selDate = addDays(S.selDate, -1); render(); });
