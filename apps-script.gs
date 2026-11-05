@@ -1,11 +1,13 @@
 // 驅魔實驗室後端
-// 資料存在部署者自己 Google 雲端硬碟裡的一份試算表。網站公開，不需要登入。
+// 資料存在部署者自己 Google 雲端硬碟裡的一份試算表。打卡等內容公開；留言和修改規則要用姓名和密碼登入。
 // 安裝：
 //   1. 到 script.google.com 建立新專案，貼上這整段，存檔
 //   2. 上方函式選 setup → 執行 → 授權
 //   3. 部署 → 新增部署作業 → 網頁應用程式 → 執行身分「我」、存取權「所有人」→ 部署 → 複製網址
 
 const PEOPLE = ["邱子芸", "江宇熙"];
+const ADMIN = PEOPLE[0];
+const DEFAULT_OBSERVERS = ["邱美琪"];
 
 const TABS = {
   "設定": ["項目", "值"],
@@ -15,6 +17,61 @@ const TABS = {
 };
 
 const props = () => PropertiesService.getScriptProperties();
+
+/* ---------- 登入 ---------- */
+const sign = (value, key) => Utilities.base64EncodeWebSafe(Utilities.computeHmacSha256Signature(value, key, Utilities.Charset.UTF_8));
+function secret() {
+  let s = props().getProperty("secret");
+  if (!s) { s = Utilities.getUuid() + Utilities.getUuid(); props().setProperty("secret", s); }
+  return s;
+}
+function hashPassword(password, salt) {
+  let h = password;
+  for (let i = 0; i < 1000; i++) h = sign(h, salt);
+  return h;
+}
+function setPassword(name, password) {
+  if (String(password).length < 4) throw appError("invalid", "密碼至少 4 個字");
+  const salt = Utilities.getUuid();
+  props().setProperty("pw:" + name, salt + ":" + hashPassword(String(password), salt));
+}
+// 權杖綁定目前的密碼，改密碼後舊的登入就失效
+function makeToken(name, exp) {
+  return exp + "." + sign(name + "|" + exp, secret() + props().getProperty("pw:" + name));
+}
+function observers(ss) {
+  const row = rows(ss, "設定").filter(r => r[0] === "實驗")[0];
+  const cfg = row ? parse(row[1], null) : null;
+  return cfg && cfg.observers && cfg.observers.length ? cfg.observers : DEFAULT_OBSERVERS;
+}
+const users = ss => PEOPLE.concat(observers(ss));
+function whoIs(ss, auth) {
+  if (!auth || !auth.name || !auth.token) return "";
+  const name = String(auth.name), exp = Number(String(auth.token).split(".")[0]);
+  if (users(ss).indexOf(name) < 0 || !props().getProperty("pw:" + name) || !(exp > Date.now())) return "";
+  return makeToken(name, exp) === auth.token ? name : "";
+}
+function login(ss, p) {
+  const name = String(p.name || "").trim().slice(0, 40), password = String(p.password || "");
+  const cache = CacheService.getScriptCache(), key = "fail:" + name, fails = Number(cache.get(key)) || 0;
+  if (fails >= 5) throw appError("invalid", "試太多次了，請 10 分鐘後再試");
+  const bad = () => { cache.put(key, String(fails + 1), 600); return appError("invalid", "姓名或密碼不正確"); };
+  if (users(ss).indexOf(name) < 0) throw bad();
+  const saved = props().getProperty("pw:" + name);
+  if (saved) {
+    const [salt, hash] = saved.split(":");
+    if (hashPassword(password, salt) !== hash) throw bad();
+  } else if (name === ADMIN) {
+    setPassword(name, password); // 邱子芸第一次登入時設定自己的密碼
+  } else {
+    throw appError("invalid", "還沒設定密碼，請邱子芸到規則頁設定");
+  }
+  cache.remove(key);
+  const exp = Date.now() + 120 * 86400000;
+  return { name: name, token: makeToken(name, exp) };
+}
+// 實驗者看寫給自己的留言，觀察者看自己寫的留言
+const canSeeNote = (n, me) => !!me && (PEOPLE.indexOf(me) >= 0 ? n.person === me : n.role === me);
 
 /* ---------- 安裝 ---------- */
 function setup() {
@@ -85,7 +142,7 @@ function removeRow(sh, key) {
   if (row) sh.deleteRow(row);
 }
 
-function snapshot(ss) {
+function snapshot(ss, me) {
   const settings = {};
   rows(ss, "設定").forEach(r => { settings[r[0]] = r[1]; });
   const by = {};
@@ -102,7 +159,10 @@ function snapshot(ss) {
       id: r[0], date: r[1], energy: r[2] ? Number(r[2]) : null, body: r[3],
       createdAt: Number(r[4]) || 0, editedAt: Number(r[5]) || 0, person: r[6] || PEOPLE[0],
     })),
-    notes: rows(ss, "留言").map(r => ({ id: r[0], body: r[1], createdAt: Number(r[2]) || 0, role: r[3], person: r[4] || PEOPLE[0] })),
+    notes: rows(ss, "留言").map(r => ({ id: r[0], body: r[1], createdAt: Number(r[2]) || 0, role: r[3], person: r[4] || PEOPLE[0] }))
+      .filter(n => canSeeNote(n, me)),
+    me: me || null,
+    hasPassword: me === ADMIN ? users(ss).filter(n => props().getProperty("pw:" + n)) : [],
   };
 }
 function parse(s, fallback) { try { return JSON.parse(s); } catch (e) { return fallback; } }
@@ -162,14 +222,18 @@ function doGet() { return out({ ok: true, service: "exorcism-lab" }); }
 function doPost(e) {
   try {
     const p = JSON.parse(e.postData.contents);
-    if (p.action === "getAll") return out({ ok: true, data: snapshot(book()) });
+    if (p.action === "getAll") { const ss = book(); return out({ ok: true, data: snapshot(ss, whoIs(ss, p.auth)) }); }
     const lock = LockService.getScriptLock();
     lock.waitLock(20000);
     try {
       const ss = book();
-      applyWrite(ss, p);
+      if (p.action === "login") {
+        const session = login(ss, p);
+        return out({ ok: true, session: session, data: snapshot(ss, session.name) });
+      }
+      applyWrite(ss, p, whoIs(ss, p.auth));
       SpreadsheetApp.flush();
-      return out({ ok: true, data: snapshot(ss) });
+      return out({ ok: true, data: snapshot(ss, whoIs(ss, p.auth)) });
     } finally {
       lock.releaseLock();
     }
@@ -178,10 +242,16 @@ function doPost(e) {
   }
 }
 
-function applyWrite(ss, p) {
+function applyWrite(ss, p, me) {
   switch (p.action) {
     case "saveConfig":
+      if (me !== ADMIN) throw appError("invalid", "只有邱子芸可以修改規則");
       upsert(tab(ss, "設定"), "實驗", ["實驗", JSON.stringify(cleanCfg(p.cfg))]);
+      return;
+    case "setPassword":
+      if (me !== ADMIN) throw appError("invalid", "只有邱子芸可以設定密碼");
+      if (users(ss).indexOf(p.name) < 0) throw appError("invalid", "找不到這個人");
+      setPassword(p.name, p.password);
       return;
     case "setCheckin":
       if (!isDate(p.date)) throw appError("invalid", "日期不正確");
@@ -209,13 +279,19 @@ function applyWrite(ss, p) {
       removeRow(tab(ss, "歷程"), String(p.id));
       return;
     case "addNote": {
-      const sh = tab(ss, "留言"), role = String(p.role || "observer").slice(0, 20);
-      put(sh, sh.getLastRow() + 1, [Utilities.getUuid(), text(p.body, 3000), Date.now(), role, person(p.person)]);
+      if (!me || PEOPLE.indexOf(me) >= 0) throw appError("invalid", "請用觀察者身分登入後留言");
+      const sh = tab(ss, "留言");
+      put(sh, sh.getLastRow() + 1, [Utilities.getUuid(), text(p.body, 3000), Date.now(), me, person(p.person)]);
       return;
     }
-    case "deleteNote":
-      removeRow(tab(ss, "留言"), String(p.id));
+    case "deleteNote": {
+      const sh = tab(ss, "留言"), row = findRow(sh, String(p.id));
+      if (!row) return;
+      const r = sh.getRange(row, 1, 1, 5).getValues()[0];
+      if (!canSeeNote({ role: String(r[3]), person: String(r[4]) || PEOPLE[0] }, me)) throw appError("invalid", "只能刪除自己的留言");
+      sh.deleteRow(row);
       return;
+    }
     default:
       throw appError("invalid", "不支援的動作");
   }

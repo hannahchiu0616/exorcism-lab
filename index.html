@@ -50,8 +50,10 @@ button { cursor: pointer; }
 .count b { display: block; font-family: var(--mono); font-size: 28px; line-height: 1.2; font-weight: 500; font-variant-numeric: tabular-nums; }
 
 .tabs { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); }
+.login { display: grid; gap: 12px; margin: 14px 0 0; }
+.who { display: flex; justify-content: flex-end; align-items: center; gap: 12px; margin: 14px 0 0; font-size: 14px; color: var(--muted); }
+.readonly form, .readonly .edit-list button { display: none; }
 .people { display: flex; gap: 8px; margin: 14px 0 0; }
-.people[hidden] { display: none; }
 .people button { flex: 1 1 0; max-width: 160px; padding: 9px 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 4px; font-weight: 500; color: var(--muted); }
 .people button[aria-pressed="true"] { background: var(--talisman); color: var(--on-talisman); border-color: transparent; font-weight: 700; }
 .tabs .wrap { display: flex; gap: 2px; overflow-x: auto; }
@@ -188,6 +190,16 @@ textarea.short { min-height: 76px; }
 
 <main class="wrap">
   <p class="banner" id="banner" hidden></p>
+  <form class="login" id="login-form" hidden>
+    <h2>登入</h2>
+    <p class="muted" id="login-hint"></p>
+    <div class="two">
+      <label class="field">姓名<input type="text" id="login-name" maxlength="20" autocomplete="username" required></label>
+      <label class="field">密碼<input type="password" id="login-pass" maxlength="60" autocomplete="current-password" required></label>
+    </div>
+    <button class="primary" type="submit">登入</button>
+  </form>
+  <p class="who" id="who-bar" hidden><span id="who-name"></span><button class="link" id="logout" type="button">登出</button></p>
   <div class="people" id="people" role="group" aria-label="實驗者"></div>
 
   <section class="panel" id="view-checkin" role="tabpanel" aria-labelledby="tab-checkin">
@@ -248,15 +260,14 @@ textarea.short { min-height: 76px; }
 
   <section class="panel" id="view-notes" role="tabpanel" aria-labelledby="tab-notes" hidden>
     <form id="note-form">
-      <div class="people" id="observer-pick" role="group" aria-label="留言者"></div>
-      <h2>留下一則留言</h2>
+      <h2 id="note-heading">留下一則留言</h2>
       <label class="field">留言內容
         <textarea id="note-body" maxlength="3000" required placeholder="這段時間你看到了什麼變化？"></textarea>
       </label>
       <button class="primary" type="submit">送出留言</button>
     </form>
-    <div class="group">
-      <h2>所有留言</h2>
+    <div class="group" id="note-group">
+      <h2>我的留言</h2>
       <ol class="entries" id="note-list"></ol>
       <p class="empty" id="note-empty" hidden></p>
     </div>
@@ -299,6 +310,17 @@ textarea.short { min-height: 76px; }
       </div>
     </div>
     <div class="group">
+      <div id="account-group" class="group" hidden>
+        <h2>帳號密碼</h2>
+        <ul class="edit-list" id="account-list"></ul>
+        <form id="account-form">
+          <div class="two">
+            <label class="field">姓名<select id="account-name"></select></label>
+            <label class="field">新密碼<input type="text" id="account-pass" minlength="4" maxlength="60" autocomplete="off" required></label>
+          </div>
+          <button class="primary" type="submit">設定密碼</button>
+        </form>
+      </div>
       <h2>觀察者</h2>
       <ul class="edit-list" id="observer-list"></ul>
       <form id="observer-form">
@@ -336,11 +358,12 @@ textarea.short { min-height: 76px; }
   const S = {
     loaded: false, drafts: {}, saving: false, month: null, week: null,
     cfg: null, checkins: {}, checkinsBy: {}, multi: false, person: PEOPLE[0], journal: [], notes: [],
+    auth: null, me: "", hasPassword: [],
     view: "checkin", selDate: null, justStamped: null, editing: null,
   };
 
   try { const p = localStorage.getItem("person"); if (PEOPLE.includes(p)) S.person = p; } catch (e) { /* the default person is fine */ }
-  try { S.observer = localStorage.getItem("observer"); } catch (e) { /* the first observer is fine */ }
+  try { S.auth = JSON.parse(localStorage.getItem("auth")); S.me = (S.auth && S.auth.name) || ""; } catch (e) { S.auth = null; }
 
   /* ---- dates: plain YYYY-MM-DD strings in the viewer's local calendar ---- */
   const pad = (n) => String(n).padStart(2, "0");
@@ -444,7 +467,7 @@ textarea.short { min-height: 76px; }
 
   /* ---- writes: one at a time, in order ---- */
   async function call(action, body) {
-    const res = await fetch(API, { method: "POST", body: JSON.stringify({ action, ...body }) });
+    const res = await fetch(API, { method: "POST", body: JSON.stringify({ action, auth: S.auth, ...body }) });
     const d = await res.json();
     if (!d.ok) { const e = new Error(d.error || "request failed"); e.code = d.code; throw e; }
     return d;
@@ -457,6 +480,8 @@ textarea.short { min-height: 76px; }
     S.cfg = data.cfg || null;
     if (S.cfg && !Array.isArray(S.cfg.practices)) S.cfg.practices = [];
     S.multi = !!data.checkinsBy;
+    if (S.multi && S.auth && data.me !== S.auth.name) { setAuth(null); toast("登入已失效，請重新登入。"); }
+    S.hasPassword = data.hasPassword || [];
     S.checkinsBy = data.checkinsBy || { [PEOPLE[0]]: data.checkins || {} };
     S.checkins = S.checkinsBy[S.person] || {};
     S.journal = data.journal || [];
@@ -528,17 +553,27 @@ textarea.short { min-height: 76px; }
     }
   }
   const observers = () => (S.cfg && S.cfg.observers && S.cfg.observers.length ? S.cfg.observers : DEFAULT_OBSERVERS);
-  const noteAuthor = () => (observers().includes(S.observer) ? S.observer : observers()[0]);
   function renderObservers() {
-    const list = observers(), me = noteAuthor(), bar = $("observer-pick");
-    bar.hidden = list.length < 2;
-    bar.replaceChildren(...list.map((n) => h("button", { type: "button", "aria-pressed": String(n === me), on: { click: () => { S.observer = n; rememberObserver(n); render(); } } }, n)));
+    const list = observers();
     $("observer-list").replaceChildren(...list.map((n) => h("li", null, h("span", null, n),
       list.length > 1 ? deleteButton("移除", () => setObservers(list.filter((x) => x !== n), "已移除觀察者")) : null)));
+    const names = [...PEOPLE, ...list], select = $("account-name"), chosen = select.value;
+    $("account-group").hidden = S.me !== PEOPLE[0];
+    $("account-list").replaceChildren(...names.map((n) => h("li", null, h("span", null, n), h("span", { class: "muted" }, S.hasPassword.includes(n) ? "已設定密碼" : "未設定"))));
+    if (document.activeElement !== select) {
+      select.replaceChildren(...names.map((n) => h("option", null, n)));
+      if (names.includes(chosen)) select.value = chosen;
+    }
   }
+  const isObserver = () => !!S.me && !PEOPLE.includes(S.me);
   function renderPeople() {
     const bar = $("people"), buttons = () => PEOPLE.map((p) => h("button", { type: "button", "aria-pressed": String(p === S.person), on: { click: () => pickPerson(p) } }, p));
-    bar.hidden = S.view === "rules";
+    const gated = S.view === "notes" || S.view === "rules";
+    $("login-form").hidden = !gated || !!S.me;
+    $("who-bar").hidden = !gated || !S.me;
+    $("who-name").textContent = `已登入：${S.me}`;
+    $("login-hint").textContent = S.view === "notes" ? "登入後才看得到自己的留言。" : "規則大家都可以看，邱子芸登入後可以修改。";
+    bar.hidden = S.view === "rules" || (S.view === "notes" && !isObserver());
     bar.replaceChildren(...buttons());
     $("rest-people").replaceChildren(...buttons());
   }
@@ -684,6 +719,9 @@ textarea.short { min-height: 76px; }
     $("edit-list").replaceChildren(...(list.length ? list.map((p) => h("li", null,
       h("span", null, p.name, p.note ? `（${p.note}）` : ""),
       deleteButton("移除", () => removePractice(p.id)))) : [h("li", { class: "muted" }, "清單是空的，用下方表單加入。")]));
+    const admin = S.me === PEOPLE[0], panel = $("view-rules");
+    panel.classList.toggle("readonly", !admin);
+    for (const el of panel.querySelectorAll("input, textarea, select, .picks button")) el.disabled = !admin;
   }
   function renderJournal() {
     const dateInput = $("journal-date");
@@ -702,7 +740,10 @@ textarea.short { min-height: 76px; }
     empty.textContent = "還沒有紀錄。用上方表單寫下第一篇。";
   }
   function renderNotes() {
-    const list = S.notes.filter((n) => (n.person || PEOPLE[0]) === S.person).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    $("note-form").hidden = !isObserver();
+    $("note-group").hidden = !S.me;
+    $("note-heading").textContent = `留言給 ${S.person}`;
+    const list = S.notes.filter((n) => !isObserver() || (n.person || PEOPLE[0]) === S.person).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
     $("note-list").replaceChildren(...list.map((n) => {
       const date = n.createdAt ? toIso(new Date(n.createdAt)) : null;
       return h("li", { class: "entry" },
@@ -730,6 +771,10 @@ textarea.short { min-height: 76px; }
     toast("沒有存到，請先更新 Google 後端。");
     return true;
   };
+  function setAuth(a) {
+    S.auth = a; S.me = a ? a.name : "";
+    try { if (a) localStorage.setItem("auth", JSON.stringify(a)); else localStorage.removeItem("auth"); } catch (e) { /* stays signed in for this visit only */ }
+  }
   function pickPerson(p) {
     S.person = p; S.checkins = S.checkinsBy[p] || {}; S.drafts = {};
     try { localStorage.setItem("person", p); } catch (e) { /* remembering is optional */ }
@@ -780,7 +825,6 @@ textarea.short { min-height: 76px; }
     next.observers = list;
     saveCfg(next).then((ok) => ok && toast(S.cfg && S.cfg.observers ? msg : "沒有存到，請先更新 Google 後端。"));
   }
-  function rememberObserver(n) { try { localStorage.setItem("observer", n); } catch (e) { /* remembering is optional */ } }
   function saveRules(patch, msg) {
     const next = baseCfg();
     next.rules = { ...rules(), ...patch };
@@ -861,6 +905,30 @@ textarea.short { min-height: 76px; }
     if (d) { setRest(d, true, why); $("rest-date").value = ""; $("rest-other").value = ""; }
   });
 
+  $("login-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (S.loaded && !S.multi) { toast("請先更新 Google 後端。"); return; }
+    writes++;
+    try {
+      const d = await call("login", { name: $("login-name").value.trim(), password: $("login-pass").value });
+      setAuth(d.session);
+      $("login-pass").value = "";
+      applyData(d.data);
+      toast(`${S.me}，已登入`);
+    } catch (err) {
+      toast(err.code === "invalid" ? err.message : "登入失敗，請檢查網路後再試一次。");
+    }
+  });
+  $("logout").addEventListener("click", () => {
+    setAuth(null); S.notes = []; S.hasPassword = []; lastRaw = ""; writes++;
+    render(); refresh();
+  });
+  $("account-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const name = $("account-name").value, password = $("account-pass").value;
+    const ok = await write("setPassword", { name, password });
+    if (ok) { $("account-pass").value = ""; toast(`已設定 ${name} 的密碼`); }
+  });
   $("observer-form").addEventListener("submit", (e) => {
     e.preventDefault();
     const name = $("observer-name").value.trim();
@@ -910,7 +978,7 @@ textarea.short { min-height: 76px; }
     e.preventDefault();
     const body = $("note-body").value.trim();
     if (!body) return;
-    const ok = await write("addNote", { role: noteAuthor(), person: S.person, body: sheetSafe(body) });
+    const ok = await write("addNote", { person: S.person, body: sheetSafe(body) });
     if (ok) { $("note-body").value = ""; toast("留言已送出"); }
   });
 
