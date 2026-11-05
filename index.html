@@ -275,10 +275,11 @@ textarea.short { min-height: 76px; }
             <select id="rest-reason">
               <option>大堂課</option>
               <option>國定假日</option>
-              <option>特殊原因</option>
+              <option>其他</option>
             </select>
           </label>
         </div>
+        <label class="field" id="rest-other-field" hidden>其他原因<input type="text" id="rest-other" maxlength="20" placeholder="自己填寫原因"></label>
         <button class="primary" type="submit">加入休息日</button>
       </form>
     </div>
@@ -765,10 +766,13 @@ textarea.short { min-height: 76px; }
     S.selDate = d; render();
   });
   $("rule-text").addEventListener("change", (e) => saveRules({ text: e.target.value.trim() }, "已更新規則"));
+  $("rest-reason").addEventListener("change", (e) => { $("rest-other-field").hidden = e.target.value !== "其他"; });
   $("rest-form").addEventListener("submit", (e) => {
     e.preventDefault();
     const d = $("rest-date").value;
-    if (d) { setRest(d, true, $("rest-reason").value); $("rest-date").value = ""; }
+    const isOther = $("rest-reason").value === "其他", why = isOther ? $("rest-other").value.trim() : $("rest-reason").value;
+    if (isOther && !why) { toast("請填寫原因。"); $("rest-other").focus(); return; }
+    if (d) { setRest(d, true, why); $("rest-date").value = ""; $("rest-other").value = ""; }
   });
 
   $("add-form").addEventListener("submit", (e) => {
