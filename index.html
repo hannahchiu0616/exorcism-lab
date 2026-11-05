@@ -261,6 +261,7 @@ textarea.short { min-height: 76px; }
   </section>
 
   <section class="panel" id="view-notes" role="tabpanel" aria-labelledby="tab-notes" hidden>
+    <p class="muted" id="notes-experimenter" hidden>留言板只有觀察者能看。</p>
     <form id="note-form">
       <h2 id="note-heading">留下一則留言</h2>
       <label class="field">留言內容
@@ -580,7 +581,7 @@ textarea.short { min-height: 76px; }
     $("login-form").hidden = !gated || !!S.me;
     $("who-bar").hidden = !gated || !S.me;
     $("who-name").textContent = `已登入：${S.me}`;
-    $("login-hint").textContent = S.view === "journal" ? "心路歷程只有本人能寫和看，請先登入。" : S.view === "notes" ? "登入後才看得到自己的留言。" : "規則大家都可以看，邱子芸登入後可以修改。";
+    $("login-hint").textContent = S.view === "journal" ? "心路歷程只有本人能寫和看，請先登入。" : S.view === "notes" ? "留言板只有觀察者能看，請先登入。" : "規則大家都可以看，邱子芸登入後可以修改。";
     bar.hidden = S.view === "rules" || S.view === "journal" || (S.view === "notes" && !isObserver());
     bar.replaceChildren(...buttons());
     $("rest-people").replaceChildren(...buttons());
@@ -753,9 +754,10 @@ textarea.short { min-height: 76px; }
   }
   function renderNotes() {
     $("note-form").hidden = !isObserver();
-    $("note-group").hidden = !S.me;
+    $("note-group").hidden = !isObserver();
+    $("notes-experimenter").hidden = !S.me || isObserver();
     $("note-heading").textContent = `留言給 ${S.person}`;
-    const list = S.notes.filter((n) => !isObserver() || (n.person || PEOPLE[0]) === S.person).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    const list = S.notes.filter((n) => (n.person || PEOPLE[0]) === S.person).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
     $("note-list").replaceChildren(...list.map((n) => {
       const date = n.createdAt ? toIso(new Date(n.createdAt)) : null;
       return h("li", { class: "entry" },

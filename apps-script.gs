@@ -71,8 +71,8 @@ function login(ss, p) {
   cache.remove(key);
   return makeSession(name);
 }
-// 實驗者看寫給自己的留言，觀察者看自己寫的留言
-const canSeeNote = (n, me) => !!me && (PEOPLE.indexOf(me) >= 0 ? n.person === me : n.role === me);
+// 留言只有寫的那位觀察者看得到，實驗者不能看
+const canSeeNote = (n, me) => !!me && PEOPLE.indexOf(me) < 0 && n.role === me;
 
 /* ---------- 安裝 ---------- */
 function setup() {
