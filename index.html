@@ -75,13 +75,13 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 .prac-text { min-width: 0; overflow-wrap: anywhere; }
 .prac-text b { display: block; font-weight: 500; }
 .prac-text small { display: block; color: var(--muted); font-size: 13px; }
-.seal { flex: none; width: 40px; height: 40px; display: grid; place-items: center; border: 1.5px dashed var(--line); border-radius: 3px; font-family: var(--display); font-weight: 900; font-size: 22px; color: transparent; }
-.prac[aria-checked="true"] .seal { background: var(--cinnabar); border: 0; color: var(--on-cinnabar); transform: rotate(-7deg); }
+.seal { flex: none; width: 40px; height: 40px; display: grid; place-items: center; border: 1.5px dashed var(--line); border-radius: 3px; font-family: var(--body); font-weight: 700; font-size: 24px; color: transparent; }
+.prac[aria-checked="true"] .seal { background: var(--cinnabar); border: 0; color: var(--on-cinnabar); }
 .prac[aria-checked="true"] .prac-text b { color: var(--muted); }
 .prac.locked { background: var(--bg); }
-.prac.locked .seal { background: var(--muted); color: var(--bg); transform: none; font-family: var(--body); font-size: 20px; }
+.prac.locked .seal { background: var(--muted); color: var(--bg); }
 .stamp .seal { animation: stamp .24s ease-out; }
-@keyframes stamp { from { transform: scale(1.7) rotate(-14deg); opacity: .3; } to { transform: scale(1) rotate(-7deg); opacity: 1; } }
+@keyframes stamp { from { transform: scale(1.7); opacity: .3; } to { transform: scale(1); opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .stamp .seal { animation: none; } }
 
 .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0; }
@@ -533,7 +533,7 @@ textarea.short { min-height: 76px; }
         type: "button", role: "checkbox", "aria-checked": String(isDone), "data-pid": p.id,
         disabled: locked, on: { click: () => toggle(p.id) },
       },
-        h("span", { class: "seal", "aria-hidden": "true" }, locked ? "✓" : "成"),
+        h("span", { class: "seal", "aria-hidden": "true" }, "✓"),
         h("span", { class: "prac-text" }, h("b", null, p.name), p.note ? h("small", null, p.note) : null, locked ? h("small", null, "已打卡") : null));
     })));
     const changed = !sameDone(picked, saved);
