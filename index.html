@@ -100,7 +100,7 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 .legend .f { background: var(--cinnabar); border-color: transparent; }
 
 .field { display: grid; gap: 4px; min-width: 0; font-size: 14px; color: var(--muted); }
-input[type="text"], input[type="date"], input[type="number"], textarea { width: 100%; min-width: 0; padding: 9px 10px; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 4px; }
+select, input[type="text"], input[type="date"], input[type="number"], textarea { width: 100%; min-width: 0; padding: 9px 10px; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 4px; }
 textarea { min-height: 132px; resize: vertical; font-family: var(--hand); font-size: 17px; line-height: 1.8; }
 .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .edit-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
@@ -122,7 +122,7 @@ form { display: grid; gap: 12px; margin: 0; min-width: 0; }
 .meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; font-size: 13px; color: var(--muted); }
 .meta b { color: var(--ink); font-size: 15px; font-weight: 700; }
 .pill { padding: 0 7px; border-radius: 3px; background: var(--talisman-soft); color: var(--on-talisman); font-size: 12px; }
-.pill.me { background: var(--cinnabar); color: var(--on-cinnabar); }
+.rest-tag { margin-left: 8px; }
 .text { margin: 0; font-family: var(--hand); font-size: 17px; line-height: 1.85; white-space: pre-wrap; overflow-wrap: anywhere; }
 .entry .actions { margin-top: 2px; gap: 14px; }
 
@@ -261,7 +261,16 @@ textarea.short { min-height: 76px; }
       <p class="muted">國定假日或其他要休息的日子加在這裡，這天不列入打卡和完成率。</p>
       <ul class="edit-list" id="rest-list"></ul>
       <form id="rest-form">
-        <label class="field">日期<input type="date" id="rest-date" required></label>
+        <div class="two">
+          <label class="field">日期<input type="date" id="rest-date" required></label>
+          <label class="field">原因
+            <select id="rest-reason">
+              <option>大堂課</option>
+              <option>國定假日</option>
+              <option>特殊原因</option>
+            </select>
+          </label>
+        </div>
         <button class="primary" type="submit">加入休息日</button>
       </form>
     </div>
@@ -291,7 +300,7 @@ textarea.short { min-height: 76px; }
   const WEEK = ["日", "一", "二", "三", "四", "五", "六"];
   const VIEWS = ["checkin", "overview", "journal", "notes", "rules"];
   const DEFAULT_DAYS = 21;
-  const DEFAULT_RULES = { weekdays: [1, 2, 3, 4, 5], restDays: [], text: "只做平日，見紅就休息" };
+  const DEFAULT_RULES = { weekdays: [1, 2, 3, 4, 5], restDays: [], restReasons: {}, text: "只做平日，見紅就休息" };
 
   const API = "https://script.google.com/macros/s/AKfycbyHMXCObmXzh1VNL9aL0vl6xC8JHrlRmGY83uN88fDpYnO5roRPZfF3bfiQYEmc-ccr/exec"; /* Apps Script 網頁應用程式網址 */
   const POLL_MS = 30000;
@@ -329,7 +338,7 @@ textarea.short { min-height: 76px; }
   const weekdayOf = (s) => new Date(utc(s)).getUTCDay();
   const restReason = (date) => {
     const r = rules();
-    if (r.restDays.includes(date)) return "休息日";
+    if (r.restDays.includes(date)) return r.restReasons[date] || "休息日";
     return r.weekdays.includes(weekdayOf(date)) ? "" : `週${WEEK[weekdayOf(date)]}休息`;
   };
   const activeOn = (date) => (restReason(date) ? [] : (S.cfg ? S.cfg.practices : []).filter((p) => applies(p, date)));
@@ -587,7 +596,7 @@ textarea.short { min-height: 76px; }
     }, `週${WEEK[d]}`));
     $("weekday-picks").replaceChildren(...picks);
     $("rest-list").replaceChildren(...(r.restDays.length ? [...r.restDays].sort().map((d) => h("li", null,
-      h("span", null, prettyDate(d)),
+      h("span", null, prettyDate(d), r.restReasons[d] ? h("span", { class: "pill rest-tag" }, r.restReasons[d]) : null),
       deleteButton("移除", () => setRest(d, false)))) : [h("li", { class: "muted" }, "目前沒有休息日。")]));
     const start = $("set-start"), end = $("set-end");
     if (document.activeElement !== start) start.value = S.cfg ? S.cfg.startDate : (start.value || today());
@@ -670,16 +679,19 @@ textarea.short { min-height: 76px; }
     const next = baseCfg();
     next.rules = { ...rules(), ...patch };
     saveCfg(next).then((ok) => {
-      if (ok) toast(S.cfg && S.cfg.rules ? msg : "規則沒有存到，請先更新 Google 後端。");
+      const stored = S.cfg && S.cfg.rules && (!patch.restReasons || S.cfg.rules.restReasons);
+      if (ok) toast(stored ? msg : "沒有存到，請先更新 Google 後端。");
     });
   }
   function toggleWeekday(d) {
     const cur = rules().weekdays;
     saveRules({ weekdays: cur.includes(d) ? cur.filter((x) => x !== d) : [...cur, d] }, "已更新要做訂課的日子");
   }
-  function setRest(date, on) {
-    const cur = rules().restDays.filter((d) => d !== date);
-    saveRules({ restDays: on ? [...cur, date] : cur }, on ? "已設為休息日" : "已取消休息日");
+  function setRest(date, on, why) {
+    const cur = rules().restDays.filter((d) => d !== date), restReasons = { ...rules().restReasons };
+    delete restReasons[date];
+    if (on) restReasons[date] = why;
+    saveRules({ restDays: on ? [...cur, date] : cur, restReasons }, on ? `已加入休息日：${why}` : "已取消休息日");
   }
   function removePractice(pid) {
     const next = baseCfg(), t = today();
@@ -730,7 +742,7 @@ textarea.short { min-height: 76px; }
   $("rest-form").addEventListener("submit", (e) => {
     e.preventDefault();
     const d = $("rest-date").value;
-    if (d) { setRest(d, true); $("rest-date").value = ""; }
+    if (d) { setRest(d, true, $("rest-reason").value); $("rest-date").value = ""; }
   });
 
   $("add-form").addEventListener("submit", (e) => {

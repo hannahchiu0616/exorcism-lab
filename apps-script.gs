@@ -105,6 +105,7 @@ function cleanCfg(c) {
     rules: {
       weekdays: (Array.isArray(r.weekdays) ? r.weekdays : [1, 2, 3, 4, 5]).map(Number).filter(d => d >= 0 && d <= 6),
       restDays: (Array.isArray(r.restDays) ? r.restDays : []).filter(isDate).slice(0, 366),
+      restReasons: Object.keys(r.restReasons || {}).filter(isDate).slice(0, 366).reduce((o, d) => { o[d] = String(r.restReasons[d]).slice(0, 20); return o; }, {}),
       text: String(r.text == null ? "" : r.text).slice(0, 500),
     },
     practices: c.practices.map(p => ({
