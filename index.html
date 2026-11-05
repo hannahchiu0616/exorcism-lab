@@ -90,6 +90,8 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 .stats dd { margin: 0; font-family: var(--mono); font-size: 24px; font-variant-numeric: tabular-nums; }
 .days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; max-width: 420px; }
 .day { aspect-ratio: 1; max-width: 100%; padding: 0; border: 1px solid var(--line); border-radius: 3px; background: var(--surface); font-family: var(--mono); font-size: 13px; color: var(--muted); }
+.dow { padding-block: 2px; text-align: center; font-size: 13px; color: var(--muted); }
+.day.today { outline: 2px solid var(--ink); outline-offset: 1px; }
 .day.part { background: var(--talisman-soft); color: var(--on-talisman); border-color: transparent; }
 .day.full { background: var(--cinnabar); color: var(--on-cinnabar); border-color: transparent; }
 .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: var(--muted); }
@@ -546,16 +548,17 @@ textarea.short { min-height: 76px; }
     const st = computeStats();
     $("stats").replaceChildren(...[["全部完成", `${st.fullDays} 天`], ["目前連續", `${st.streak} 天`], ["總完成率", `${st.rate}%`]]
       .map(([k, v]) => h("div", null, h("dt", null, k), h("dd", null, v))));
-    const t = lastElapsed(), cells = [];
+    const t = lastElapsed(), cells = WEEK.map((w) => h("div", { class: "dow" }, w));
+    for (let i = weekdayOf(S.cfg.startDate); i > 0; i--) cells.push(h("div", { "aria-hidden": "true" }));
     for (let i = 0; i < S.cfg.days; i++) {
       const d = addDays(S.cfg.startDate, i), future = !started() || d > t;
       const s = dayScore(d), rest = !!restReason(d);
       const cls = rest ? "rest" : future ? "future" : s.total && s.done === s.total ? "full" : s.done ? "part" : "";
       cells.push(h("button", {
-        class: `day ${cls}${future ? " later" : ""}`, type: "button", disabled: future,
+        class: `day ${cls}${future ? " later" : ""}${d === today() ? " today" : ""}`, type: "button", disabled: future,
         "aria-label": `第 ${i + 1} 天，${prettyDate(d)}，` + (rest ? "休息" : `完成 ${s.done} / ${s.total}`),
         title: prettyDate(d), on: { click: () => { S.selDate = d; location.hash = "checkin"; } },
-      }, String(i + 1)));
+      }, i === 0 || parts(d)[2] === 1 ? `${parts(d)[1]}/${parts(d)[2]}` : String(parts(d)[2])));
     }
     $("days").replaceChildren(...cells);
     const dates = elapsedDates().reverse();
