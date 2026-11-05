@@ -75,10 +75,10 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 .icon-btn:disabled { opacity: .35; cursor: default; }
 .link { background: none; border: 0; padding: 0; color: var(--cinnabar); font-size: 14px; text-decoration: underline; text-underline-offset: 3px; }
 
-.pracs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; align-items: start; }
-.prac-col { display: grid; gap: 8px; min-width: 0; }
-@media (max-width: 559px) { .prac { gap: 10px; padding: 10px; } .prac .seal { width: 32px; height: 32px; font-size: 19px; } }
-.prac { display: flex; align-items: center; gap: 14px; width: 100%; padding: 12px 14px; text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: 4px; }
+.pracs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 8px; }
+.prac-col { display: grid; grid-row: span var(--rows, 1); grid-template-rows: subgrid; gap: 8px; min-width: 0; }
+.prac { display: flex; align-items: center; gap: 14px; width: 100%; min-height: 74px; padding: 12px 14px; text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: 4px; }
+@media (max-width: 559px) { .prac { gap: 10px; min-height: 70px; padding: 10px; } .prac .seal { width: 32px; height: 32px; font-size: 19px; } }
 .prac:disabled { cursor: default; }
 .prac-text { min-width: 0; overflow-wrap: anywhere; }
 .prac-text b { display: block; font-weight: 500; }
@@ -649,10 +649,10 @@ textarea.short { min-height: 76px; }
         h("span", { class: "seal", "aria-hidden": "true" }, "✓"),
         h("span", { class: "prac-text" }, h("b", null, p.name), p.note ? h("small", null, p.note) : null, locked ? h("small", null, "已打卡") : null));
     };
-    const column = (items) => h("div", { class: "prac-col" }, items.map(pracButton));
-    g.append(h("div", { class: "pracs" },
-      column(list.filter((p) => LEFT_PRACTICES.test(p.name))),
-      column(list.filter((p) => !LEFT_PRACTICES.test(p.name)))));
+    const leftCol = list.filter((p) => LEFT_PRACTICES.test(p.name)), rightCol = list.filter((p) => !LEFT_PRACTICES.test(p.name));
+    const rows = Math.max(leftCol.length, rightCol.length);
+    const column = (items) => h("div", { class: "prac-col", style: `--rows: ${rows}` }, items.map(pracButton));
+    g.append(h("div", { class: "pracs" }, column(leftCol), column(rightCol)));
     const changed = !sameDone(picked, saved);
     if (!closed) g.append(h("div", { class: "actions submit-row" },
       h("button", { class: "primary", id: "checkin-submit", type: "button", disabled: !changed || S.saving, on: { click: submitCheckin } },
