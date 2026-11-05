@@ -55,12 +55,13 @@ button { cursor: pointer; }
 .people { display: flex; gap: 8px; margin: 14px 0 0; }
 .people button { flex: 1 1 0; max-width: 160px; padding: 9px 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 4px; font-weight: 500; color: var(--muted); }
 .people button[aria-pressed="true"] { background: var(--talisman); color: var(--on-talisman); border-color: transparent; font-weight: 700; }
-.tabs .wrap { display: flex; gap: 2px; overflow-x: auto; }
-.tab { flex: 1 1 auto; min-width: 0; background: none; border: 0; border-bottom: 3px solid transparent; padding: 12px 2px 9px; font-size: 14px; font-weight: 500; white-space: nowrap; color: var(--muted); }
+.tabs .wrap { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; }
+.tabs .wrap::-webkit-scrollbar { display: none; }
+.tab { flex: 1 0 auto; background: none; border: 0; border-bottom: 3px solid transparent; padding: 12px 4px 9px; font-size: 14px; font-weight: 500; white-space: nowrap; color: var(--muted); }
 .tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--cinnabar); font-weight: 700; }
 .submit-row .primary { flex: 1; min-height: 48px; font-size: 17px; }
 .primary:disabled { opacity: .5; cursor: default; }
-@media (max-width: 420px) { .tab { font-size: 13px; } }
+@media (max-width: 420px) { .tab { font-size: 13px; padding-inline: 2px; } }
 
 main.wrap { padding-block: 24px 64px; display: grid; gap: 28px; }
 section.panel { display: grid; gap: 28px; min-width: 0; }
@@ -109,8 +110,11 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 .legend .f { background: var(--cinnabar); border-color: transparent; }
 
 .field { display: grid; gap: 4px; min-width: 0; font-size: 14px; color: var(--muted); }
-select, input[type="text"], input[type="date"], input[type="number"], textarea { width: 100%; min-width: 0; padding: 9px 10px; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 4px; }
+select, input[type="text"], input[type="password"], input[type="date"], input[type="number"], textarea { width: 100%; min-width: 0; padding: 9px 10px; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 4px; }
 textarea { min-height: 132px; resize: vertical; font-family: var(--hand); font-size: 17px; line-height: 1.8; }
+/* phones give date inputs a fixed native width unless the native look is turned off */
+input[type="date"] { display: block; max-width: 100%; min-height: 44px; -webkit-appearance: none; appearance: none; }
+input[type="date"]::-webkit-date-and-time-value { min-width: 0; }
 .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .edit-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .edit-list li { display: flex; align-items: center; gap: 12px; justify-content: space-between; padding-bottom: 6px; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
@@ -137,6 +141,8 @@ form { display: grid; gap: 12px; margin: 0; min-width: 0; }
 .datebar { display: flex; align-items: flex-end; gap: 8px; }
 .date-field { flex: 1; }
 .date-field input { height: 44px; text-align: center; }
+.date-field input::-webkit-date-and-time-value { text-align: center; }
+@media (max-width: 420px) { .two { grid-template-columns: minmax(0, 1fr); } .datebar { gap: 6px; } }
 .dayline { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; font-size: 14px; color: var(--muted); }
 .remain { display: grid; gap: 2px; padding: 10px 14px; border-radius: 4px; background: var(--talisman-soft); color: var(--on-talisman); font-size: 14px; overflow-wrap: anywhere; }
 .remain b { font-size: 15px; }
