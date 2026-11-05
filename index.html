@@ -267,7 +267,7 @@ textarea.short { min-height: 76px; }
       <h2>實驗期間</h2>
       <div class="two">
         <label class="field">開始日期<input type="date" id="set-start"></label>
-        <label class="field">實驗天數<input type="number" id="set-days" min="1" max="365" inputmode="numeric"></label>
+        <label class="field">結束日期<input type="date" id="set-end"></label>
       </div>
     </div>
     <div class="group">
@@ -453,8 +453,9 @@ textarea.short { min-height: 76px; }
   }
   function baseCfg() {
     if (S.cfg) return clone(S.cfg);
-    const days = Number($("set-days").value) || DEFAULT_DAYS;
-    return { startDate: $("set-start").value || today(), days, practices: [] };
+    const startDate = $("set-start").value || today();
+    const days = $("set-end").value ? diffDays(startDate, $("set-end").value) + 1 : DEFAULT_DAYS;
+    return { startDate, days, practices: [] };
   }
 
   /* ---- render ---- */
@@ -585,9 +586,9 @@ textarea.short { min-height: 76px; }
     $("rest-list").replaceChildren(...(r.restDays.length ? [...r.restDays].sort().map((d) => h("li", null,
       h("span", null, prettyDate(d)),
       deleteButton("移除", () => setRest(d, false)))) : [h("li", { class: "muted" }, "目前沒有休息日。")]));
-    const start = $("set-start"), days = $("set-days");
+    const start = $("set-start"), end = $("set-end");
     if (document.activeElement !== start) start.value = S.cfg ? S.cfg.startDate : (start.value || today());
-    if (document.activeElement !== days) days.value = S.cfg ? S.cfg.days : (days.value || DEFAULT_DAYS);
+    if (document.activeElement !== end) end.value = S.cfg ? lastDay() : (end.value || addDays(today(), DEFAULT_DAYS - 1));
     const list = currentPractices();
     $("edit-list").replaceChildren(...(list.length ? list.map((p) => h("li", null,
       h("span", null, p.name, p.note ? `（${p.note}）` : ""),
@@ -743,18 +744,18 @@ textarea.short { min-height: 76px; }
     saveCfg(next).then((ok) => ok && toast("已加入訂課"));
     $("add-name").focus();
   });
-  $("set-start").addEventListener("change", (e) => {
-    if (!e.target.value || !S.cfg) return;
-    const next = baseCfg(); next.startDate = e.target.value; S.selDate = null;
-    saveCfg(next).then((ok) => ok && toast("已更新開始日期"));
-  });
-  $("set-days").addEventListener("change", (e) => {
-    const n = Math.round(Number(e.target.value));
-    if (!(n >= 1 && n <= 365)) { toast("實驗天數請填 1 到 365。"); e.target.value = S.cfg ? S.cfg.days : DEFAULT_DAYS; return; }
-    if (!S.cfg) return;
-    const next = baseCfg(); next.days = n;
-    saveCfg(next).then((ok) => ok && toast("已更新實驗天數"));
-  });
+  function savePeriod() {
+    const startDate = $("set-start").value, endDate = $("set-end").value;
+    if (!S.cfg || !startDate || !endDate) return;
+    const days = diffDays(startDate, endDate) + 1;
+    if (days < 1) { toast("結束日期不能早於開始日期。"); return; }
+    if (days > 365) { toast("實驗期間最長 365 天。"); return; }
+    const next = baseCfg();
+    next.startDate = startDate; next.days = days; S.selDate = null;
+    saveCfg(next).then((ok) => ok && toast("已更新實驗期間"));
+  }
+  $("set-start").addEventListener("change", savePeriod);
+  $("set-end").addEventListener("change", savePeriod);
   $("energy").addEventListener("click", (e) => {
     const b = e.target.closest("button"); if (!b) return;
     const v = Number(b.dataset.v); setEnergy(S.energy === v ? null : v);
