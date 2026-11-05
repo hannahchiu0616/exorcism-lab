@@ -7,7 +7,7 @@
 
 const PEOPLE = ["邱子芸", "江宇熙"];
 const ADMIN = PEOPLE[0];
-const DEFAULT_OBSERVERS = ["邱美琪"];
+const DEFAULT_OBSERVERS = ["邱美琪", "張克強"];
 
 const TABS = {
   "設定": ["項目", "值"],
@@ -148,8 +148,14 @@ function snapshot(ss, me) {
     const who = r[2] || PEOPLE[0];
     (by[who] = by[who] || {})[r[0]] = { done: parse(r[1], {}) };
   });
+  // 觀察者名單只給邱子芸
+  const cfg = parse(settings["實驗"], null);
+  if (cfg) {
+    if (me === ADMIN) cfg.observers = observers(ss);
+    else delete cfg.observers;
+  }
   return {
-    cfg: parse(settings["實驗"], null),
+    cfg: cfg,
     checkins: by[PEOPLE[0]],
     checkinsBy: by,
     journal: rows(ss, "歷程").map(r => ({

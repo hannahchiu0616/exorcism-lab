@@ -198,6 +198,7 @@ textarea.short { min-height: 76px; }
       <label class="field">姓名<select id="login-name" required></select></label>
       <label class="field">密碼<input type="password" id="login-pass" maxlength="60" autocomplete="current-password" required></label>
     </div>
+    <label class="field" id="login-observer-field" hidden>觀察者姓名<input type="text" id="login-observer" maxlength="20" autocomplete="username"></label>
     <button class="primary" type="submit">登入</button>
   </form>
   <p class="who" id="who-bar" hidden><span id="who-name"></span><button class="link" id="logout" type="button">登出</button></p>
@@ -329,12 +330,14 @@ textarea.short { min-height: 76px; }
           <button class="primary" type="submit">設定密碼</button>
         </form>
       </div>
+      <div id="observer-group" class="group" hidden>
       <h2>觀察者</h2>
       <ul class="edit-list" id="observer-list"></ul>
       <form id="observer-form">
         <label class="field">觀察者姓名<input type="text" id="observer-name" maxlength="20" required></label>
         <button class="primary" type="submit">加入觀察者</button>
       </form>
+      </div>
     </div>
     <div class="group">
       <h2>訂課清單</h2>
@@ -355,7 +358,6 @@ textarea.short { min-height: 76px; }
   const WEEK = ["日", "一", "二", "三", "四", "五", "六"];
   const VIEWS = ["checkin", "overview", "journal", "notes", "rules"];
   const PEOPLE = ["邱子芸", "江宇熙"];
-  const DEFAULT_OBSERVERS = ["邱美琪"];
   const LOCK_MSG = "這天已鎖定，只能從後台修改。";
   const DEFAULT_DAYS = 21;
   const DEFAULT_RULES = { weekdays: [1, 2, 3, 4, 5], restDays: [], restReasons: {}, text: "只做平日，見紅就休息" };
@@ -560,19 +562,15 @@ textarea.short { min-height: 76px; }
       $("view-" + v).hidden = !on;
     }
   }
-  const observers = () => (S.cfg && S.cfg.observers && S.cfg.observers.length ? S.cfg.observers : DEFAULT_OBSERVERS);
+  const observers = () => (S.cfg && S.cfg.observers) || [];
   function renderObservers() {
     const list = observers();
     $("observer-list").replaceChildren(...list.map((n) => h("li", null, h("span", null, n),
       list.length > 1 ? deleteButton("移除", () => setObservers(list.filter((x) => x !== n), "已移除觀察者")) : null)));
     const names = [...PEOPLE, ...list], select = $("account-name"), chosen = select.value;
-    const loginName = $("login-name"), picked = loginName.value;
-    if (document.activeElement !== loginName) {
-      loginName.replaceChildren(h("option", { value: "" }, "請選擇姓名"), ...names.map((n) => h("option", null, n)));
-      loginName.value = names.includes(picked) ? picked : "";
-    }
     $("account-group").hidden = S.me !== PEOPLE[0];
     $("my-pass-form").hidden = !S.me;
+    $("observer-group").hidden = S.me !== PEOPLE[0];
     $("account-list").replaceChildren(...names.map((n) => h("li", null, h("span", null, n), h("span", { class: "muted" }, S.hasPassword.includes(n) ? "已設定密碼" : "未設定"))));
     if (document.activeElement !== select) {
       select.replaceChildren(...names.map((n) => h("option", null, n)));
@@ -924,12 +922,20 @@ textarea.short { min-height: 76px; }
     if (d) { setRest(d, true, why); $("rest-date").value = ""; $("rest-other").value = ""; }
   });
 
+  $("login-name").append(h("option", { value: "" }, "請選擇姓名"), ...PEOPLE.map((p) => h("option", null, p)), h("option", { value: "observer" }, "觀察者"));
+  $("login-name").addEventListener("change", (e) => {
+    const on = e.target.value === "observer";
+    $("login-observer-field").hidden = !on;
+    $("login-observer").required = on;
+  });
   $("login-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     if (S.loaded && !S.multi) { toast("請先更新 Google 後端。"); return; }
     writes++;
     try {
-      const d = await call("login", { name: $("login-name").value.trim(), password: $("login-pass").value });
+      const asObserver = $("login-name").value === "observer";
+      const name = asObserver ? $("login-observer").value.trim() : $("login-name").value;
+      const d = await call("login", { name, password: $("login-pass").value });
       setAuth(d.session);
       $("login-pass").value = "";
       applyData(d.data);
