@@ -50,10 +50,12 @@ button { cursor: pointer; }
 .count b { display: block; font-family: var(--mono); font-size: 28px; line-height: 1.2; font-weight: 500; font-variant-numeric: tabular-nums; }
 
 .tabs { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); }
-.tabs .wrap { display: flex; gap: 4px; }
+.tabs .wrap { display: flex; gap: 2px; overflow-x: auto; }
 .tab { flex: 1 1 auto; min-width: 0; background: none; border: 0; border-bottom: 3px solid transparent; padding: 12px 2px 9px; font-size: 14px; font-weight: 500; white-space: nowrap; color: var(--muted); }
 .tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--cinnabar); font-weight: 700; }
-.tab small { font-family: var(--mono); font-size: 12px; margin-left: 4px; }
+.submit-row .primary { flex: 1; min-height: 48px; font-size: 17px; }
+.primary:disabled { opacity: .5; cursor: default; }
+@media (max-width: 420px) { .tab { font-size: 13px; } }
 
 main.wrap { padding-block: 24px 64px; display: grid; gap: 28px; }
 section.panel { display: grid; gap: 28px; min-width: 0; }
@@ -161,10 +163,10 @@ textarea.short { min-height: 76px; }
 
 <nav class="tabs" aria-label="頁籤">
   <div class="wrap" role="tablist">
-    <button class="tab" role="tab" id="tab-checkin" data-view="checkin" type="button">打卡</button>
-    <button class="tab" role="tab" id="tab-overview" data-view="overview" type="button">總覽</button>
-    <button class="tab" role="tab" id="tab-journal" data-view="journal" type="button">心路歷程</button>
-    <button class="tab" role="tab" id="tab-notes" data-view="notes" type="button">留言板</button>
+    <button class="tab" role="tab" id="tab-checkin" data-view="checkin" type="button">每日打卡</button>
+    <button class="tab" role="tab" id="tab-overview" data-view="overview" type="button">打卡紀錄</button>
+    <button class="tab" role="tab" id="tab-journal" data-view="journal" type="button">實驗者心路歷程</button>
+    <button class="tab" role="tab" id="tab-notes" data-view="notes" type="button">觀察者留言板</button>
     <button class="tab" role="tab" id="tab-rules" data-view="rules" type="button">規則</button>
   </div>
 </nav>
@@ -173,7 +175,6 @@ textarea.short { min-height: 76px; }
   <p class="banner" id="banner" hidden></p>
 
   <section class="panel" id="view-checkin" role="tabpanel" aria-labelledby="tab-checkin">
-    <p class="muted" id="rule-line" hidden></p>
     <div class="group" id="check-controls" hidden>
       <div class="datebar">
         <button class="icon-btn" id="prev-day" type="button" aria-label="前一天">‹</button>
@@ -302,7 +303,7 @@ textarea.short { min-height: 76px; }
   };
 
   const S = {
-    loaded: false, noteRole: "observer",
+    loaded: false, noteRole: "observer", drafts: {}, saving: false,
     cfg: null, checkins: {}, journal: [], notes: [],
     view: "checkin", selDate: null, justStamped: null, editing: null, energy: null,
   };
@@ -427,7 +428,7 @@ textarea.short { min-height: 76px; }
     queue = run.catch(() => {});
     return run.then((d) => {
       inFlight--;
-      if (!inFlight && !checkinTimer) applyData(d.data);
+      if (!inFlight) applyData(d.data);
       return true;
     }, (e) => {
       inFlight--;
@@ -439,12 +440,12 @@ textarea.short { min-height: 76px; }
     });
   }
   async function refresh() {
-    if (!API || refreshing || document.hidden || checkinTimer) return;
+    if (!API || refreshing || document.hidden) return;
     refreshing = true;
     const startedAt = writes;
     try {
       const d = await call("getAll");
-      if (startedAt === writes && !inFlight && !checkinTimer) applyData(d.data);
+      if (startedAt === writes && !inFlight) applyData(d.data);
       setBanner("");
     } catch (e) {
       setBanner("暫時連不上紀錄，稍後會自動重試。");
@@ -480,10 +481,6 @@ textarea.short { min-height: 76px; }
       tab.setAttribute("aria-selected", String(on));
       $("view-" + v).hidden = !on;
     }
-    const label = { journal: ["心路歷程", S.journal.length], notes: ["留言板", S.notes.length] };
-    for (const [v, [name, n]] of Object.entries(label)) {
-      $("tab-" + v).replaceChildren(name, ...(n ? [h("small", null, String(n))] : []));
-    }
   }
   function clampSel() {
     if (!S.cfg || !started()) { S.selDate = null; return; }
@@ -494,9 +491,6 @@ textarea.short { min-height: 76px; }
   function renderToday() {
     const g = $("today-group");
     const focusId = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.pid : null;
-    const ruleLine = $("rule-line");
-    ruleLine.hidden = !S.loaded || !rules().text;
-    ruleLine.textContent = "規則：" + rules().text;
     const ready = S.loaded && currentPractices().length > 0 && started();
     $("check-controls").hidden = !ready;
     g.replaceChildren();
@@ -516,22 +510,22 @@ textarea.short { min-height: 76px; }
     $("prev-day").disabled = sel <= S.cfg.startDate;
     $("next-day").disabled = sel >= end;
     $("go-today").hidden = isToday || today() > end;
-    const score = dayScore(sel), done = doneMap(sel);
+    const score = dayScore(sel), saved = doneMap(sel), picked = draftOf(sel);
     const reason = restReason(sel);
-    $("day-label").textContent = `${prettyDate(sel)}　${dayLabel(sel)}` + (reason ? "" : `　完成 ${score.done} / ${score.total}`);
+    $("day-label").textContent = `${prettyDate(sel)}　${dayLabel(sel)}` + (reason ? "" : `　已打卡 ${score.done} / ${score.total}`);
     if (reason) {
       g.append(h("p", { class: "empty" }, `${reason}，這天不用打卡。`));
-      if (rules().restDays.includes(sel)) g.append(h("div", null, h("button", { class: "link", type: "button", on: { click: () => setRest(sel, false) } }, "取消這天的休息日")));
-      else g.append(h("p", { class: "muted" }, "要改成這天也做訂課，到「規則」分頁調整。"));
+      g.append(h("p", { class: "muted" }, "要調整休息日，到「規則」分頁修改。"));
       return;
     }
-    const list = activeOn(sel), left = list.filter((p) => !done[p.id]);
+    const list = activeOn(sel), left = list.filter((p) => !saved[p.id]);
     const word = isToday ? "今天" : "這天";
     g.append(left.length
       ? h("div", { class: "remain" }, h("b", null, `${word}尚未完成 ${left.length} 項`), h("span", null, left.map((p) => p.name).join("、")))
       : h("div", { class: "remain clear" }, h("b", null, `${word}的訂課全部完成`)));
+    const allPicked = list.every((p) => picked[p.id]);
     g.append(h("div", { class: "pracs" }, list.map((p) => {
-      const isDone = !!done[p.id];
+      const isDone = !!picked[p.id];
       return h("button", {
         class: "prac" + (S.justStamped === p.id && isDone ? " stamp" : ""),
         type: "button", role: "checkbox", "aria-checked": String(isDone), "data-pid": p.id,
@@ -540,9 +534,11 @@ textarea.short { min-height: 76px; }
         h("span", { class: "seal", "aria-hidden": "true" }, "成"),
         h("span", { class: "prac-text" }, h("b", null, p.name), p.note ? h("small", null, p.note) : null));
     })));
-    g.append(h("div", { class: "actions" },
-      h("button", { class: "ghost", type: "button", on: { click: () => setAll(left.length > 0) } }, left.length ? "全部勾選" : "全部取消"),
-      h("button", { class: "link", type: "button", on: { click: () => setRest(sel, true) } }, "把這天設為休息日")));
+    const changed = !sameDone(picked, saved);
+    g.append(h("div", { class: "actions submit-row" },
+      h("button", { class: "primary", id: "checkin-submit", type: "button", disabled: !changed || S.saving, on: { click: submitCheckin } },
+        S.saving ? "打卡中……" : changed || !Object.keys(saved).length ? "打卡" : "已打卡"),
+      h("button", { class: "ghost", type: "button", on: { click: () => setAll(!allPicked) } }, allPicked ? "全部取消" : "全部勾選")));
     if (focusId) { const el = g.querySelector(`[data-pid="${focusId}"]`); if (el) el.focus(); }
     S.justStamped = null;
   }
@@ -645,31 +641,33 @@ textarea.short { min-height: 76px; }
   }
 
   /* ---- actions ---- */
-  /* check-ins are saved together after a short pause, so ticking many at once is one write */
-  let dirtyDate = null, checkinTimer = null;
-  function flushCheckin() {
-    if (!checkinTimer) return;
-    clearTimeout(checkinTimer);
-    checkinTimer = null;
-    write("setCheckin", { date: dirtyDate, done: clone(doneMap(dirtyDate)) });
-  }
-  function storeDone(date, next) {
-    if (dirtyDate && dirtyDate !== date) flushCheckin();
-    S.checkins = { ...S.checkins, [date]: { done: next } };
-    render();
-    dirtyDate = date; writes++;
-    clearTimeout(checkinTimer);
-    checkinTimer = setTimeout(flushCheckin, 700);
-  }
+  /* ticks stay on this device until the 打卡 button saves them */
+  const draftOf = (date) => S.drafts[date] || doneMap(date);
+  const sameDone = (a, b) => JSON.stringify(Object.keys(a).sort()) === JSON.stringify(Object.keys(b).sort());
   function toggle(pid) {
-    const date = S.selDate, next = clone(doneMap(date));
+    const date = S.selDate, next = clone(draftOf(date));
     if (next[pid]) delete next[pid]; else { next[pid] = true; S.justStamped = pid; }
-    storeDone(date, next);
+    S.drafts[date] = next;
+    render();
   }
   function setAll(on) {
-    const date = S.selDate, next = clone(doneMap(date));
+    const date = S.selDate, next = clone(draftOf(date));
     for (const p of activeOn(date)) { if (on) next[p.id] = true; else delete next[p.id]; }
-    storeDone(date, next);
+    S.drafts[date] = next;
+    render();
+  }
+  async function submitCheckin() {
+    const date = S.selDate, done = clone(draftOf(date));
+    S.saving = true;
+    render();
+    const ok = await write("setCheckin", { date, done });
+    S.saving = false;
+    if (ok) {
+      delete S.drafts[date];
+      S.checkins = { ...S.checkins, [date]: { done } };
+      toast("已打卡");
+    }
+    render();
   }
   function saveRules(patch, msg) {
     const next = baseCfg();
@@ -721,8 +719,7 @@ textarea.short { min-height: 76px; }
   }
   window.addEventListener("hashchange", routeFromHash);
   document.addEventListener("visibilitychange", () => {
-    if (document.hidden) flushCheckin();
-    else { render(); refresh(); }
+    if (!document.hidden) { render(); refresh(); }
   });
   $("prev-day").addEventListener("click", () => { S.selDate = addDays(S.selDate, -1); render(); });
   $("next-day").addEventListener("click", () => { S.selDate = addDays(S.selDate, 1); render(); });
