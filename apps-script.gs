@@ -266,6 +266,11 @@ function applyWrite(ss, p, me) {
       if (users(ss).indexOf(p.name) < 0) throw appError("invalid", "找不到這個人");
       setPassword(p.name, p.password);
       return;
+    case "clearPassword":
+      if (me !== ADMIN) throw appError("invalid", "只有邱子芸可以清除密碼");
+      if (p.name === ADMIN) throw appError("invalid", "不能清除邱子芸自己的密碼");
+      props().deleteProperty("pw:" + p.name);
+      return;
     case "setCheckin":
       if (!isDate(p.date)) throw appError("invalid", "日期不正確");
       if (pastDeadline(p.date)) throw appError("locked", "這天已鎖定，只能從後台修改。");

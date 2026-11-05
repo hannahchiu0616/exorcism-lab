@@ -570,7 +570,8 @@ textarea.short { min-height: 76px; }
     const names = [...PEOPLE, ...list], select = $("account-name"), chosen = select.value;
     $("account-group").hidden = S.me !== PEOPLE[0];
     $("my-pass-form").hidden = !S.me;
-    $("account-list").replaceChildren(...names.map((n) => h("li", null, h("span", null, n), h("span", { class: "muted" }, S.hasPassword.includes(n) ? "已設定密碼" : "未設定"))));
+    $("account-list").replaceChildren(...names.map((n) => h("li", null, h("span", null, n), h("span", { class: "muted" }, S.hasPassword.includes(n) ? "已設定密碼" : "未設定"),
+      S.hasPassword.includes(n) && n !== PEOPLE[0] ? deleteButton("清除密碼", () => write("clearPassword", { name: n }).then((ok) => ok && toast(`已清除 ${n} 的密碼`))) : null)));
     if (document.activeElement !== select) {
       select.replaceChildren(...names.map((n) => h("option", null, n)));
       if (names.includes(chosen)) select.value = chosen;
