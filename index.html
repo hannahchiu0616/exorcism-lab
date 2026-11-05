@@ -273,6 +273,7 @@ textarea.short { min-height: 76px; }
     </div>
     <div class="group">
       <h2>休息日</h2>
+      <div class="people" id="rest-people" role="group" aria-label="休息日的實驗者"></div>
       <p class="muted">國定假日或其他要休息的日子加在這裡，這天不列入打卡和完成率。</p>
       <ul class="edit-list" id="rest-list"></ul>
       <form id="rest-form">
@@ -366,9 +367,13 @@ textarea.short { min-height: 76px; }
   const applies = (p, date) => (!p.addedOn || date >= p.addedOn) && (!p.removedOn || date < p.removedOn);
   const rules = () => ({ ...DEFAULT_RULES, ...((S.cfg && S.cfg.rules) || {}) });
   const weekdayOf = (s) => new Date(utc(s)).getUTCDay();
-  const restReason = (date) => {
+  const restOf = () => {
     const r = rules();
-    if (r.restDays.includes(date)) return r.restReasons[date] || "休息日";
+    return S.person === PEOPLE[0] ? r : (r.restBy && r.restBy[S.person]) || { restDays: [], restReasons: {} };
+  };
+  const restReason = (date) => {
+    const r = rules(), own = restOf();
+    if (own.restDays.includes(date)) return own.restReasons[date] || "休息日";
     return r.weekdays.includes(weekdayOf(date)) ? "" : `週${WEEK[weekdayOf(date)]}休息`;
   };
   const activeOn = (date) => (restReason(date) ? [] : (S.cfg ? S.cfg.practices : []).filter((p) => applies(p, date)));
@@ -532,9 +537,10 @@ textarea.short { min-height: 76px; }
       list.length > 1 ? deleteButton("移除", () => setObservers(list.filter((x) => x !== n), "已移除觀察者")) : null)));
   }
   function renderPeople() {
-    const bar = $("people");
-    bar.hidden = S.view === "notes" || S.view === "rules";
-    bar.replaceChildren(...PEOPLE.map((p) => h("button", { type: "button", "aria-pressed": String(p === S.person), on: { click: () => pickPerson(p) } }, p)));
+    const bar = $("people"), buttons = () => PEOPLE.map((p) => h("button", { type: "button", "aria-pressed": String(p === S.person), on: { click: () => pickPerson(p) } }, p));
+    bar.hidden = S.view === "rules";
+    bar.replaceChildren(...buttons());
+    $("rest-people").replaceChildren(...buttons());
   }
   function clampSel() {
     if (!S.cfg || !started()) { S.selDate = null; return; }
@@ -662,14 +668,14 @@ textarea.short { min-height: 76px; }
     $("matrix").replaceChildren(h("table", { class: "matrix" }, h("thead", null, head), h("tbody", null, body)));
   }
   function renderRules() {
-    const r = rules(), text = $("rule-text");
+    const r = rules(), own = restOf(), text = $("rule-text");
     if (document.activeElement !== text) text.value = r.text;
     const picks = [1, 2, 3, 4, 5, 6, 0].map((d) => h("button", {
       type: "button", "aria-pressed": String(r.weekdays.includes(d)), on: { click: () => toggleWeekday(d) },
     }, `週${WEEK[d]}`));
     $("weekday-picks").replaceChildren(...picks);
-    $("rest-list").replaceChildren(...(r.restDays.length ? [...r.restDays].sort().map((d) => h("li", null,
-      h("span", null, prettyDate(d), r.restReasons[d] ? h("span", { class: "pill rest-tag" }, r.restReasons[d]) : null),
+    $("rest-list").replaceChildren(...(own.restDays.length ? [...own.restDays].sort().map((d) => h("li", null,
+      h("span", null, prettyDate(d), own.restReasons[d] ? h("span", { class: "pill rest-tag" }, own.restReasons[d]) : null),
       deleteButton("移除", () => setRest(d, false)))) : [h("li", { class: "muted" }, "目前沒有休息日。")]));
     const start = $("set-start"), end = $("set-end");
     if (document.activeElement !== start) start.value = S.cfg ? S.cfg.startDate : (start.value || today());
@@ -696,7 +702,7 @@ textarea.short { min-height: 76px; }
     empty.textContent = "還沒有紀錄。用上方表單寫下第一篇。";
   }
   function renderNotes() {
-    const list = [...S.notes].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    const list = S.notes.filter((n) => (n.person || PEOPLE[0]) === S.person).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
     $("note-list").replaceChildren(...list.map((n) => {
       const date = n.createdAt ? toIso(new Date(n.createdAt)) : null;
       return h("li", { class: "entry" },
@@ -779,7 +785,7 @@ textarea.short { min-height: 76px; }
     const next = baseCfg();
     next.rules = { ...rules(), ...patch };
     saveCfg(next).then((ok) => {
-      const stored = S.cfg && S.cfg.rules && (!patch.restReasons || S.cfg.rules.restReasons);
+      const stored = S.cfg && S.cfg.rules && (!patch.restReasons || S.cfg.rules.restReasons) && (!patch.restBy || S.cfg.rules.restBy);
       if (ok) toast(stored ? msg : "沒有存到，請先更新 Google 後端。");
     });
   }
@@ -788,10 +794,11 @@ textarea.short { min-height: 76px; }
     saveRules({ weekdays: cur.includes(d) ? cur.filter((x) => x !== d) : [...cur, d] }, "已更新要做訂課的日子");
   }
   function setRest(date, on, why) {
-    const cur = rules().restDays.filter((d) => d !== date), restReasons = { ...rules().restReasons };
+    const own = restOf(), cur = own.restDays.filter((d) => d !== date), restReasons = { ...own.restReasons };
     delete restReasons[date];
     if (on) restReasons[date] = why;
-    saveRules({ restDays: on ? [...cur, date] : cur, restReasons }, on ? `已加入休息日：${why}` : "已取消休息日");
+    const patch = { restDays: on ? [...cur, date] : cur, restReasons };
+    saveRules(S.person === PEOPLE[0] ? patch : { restBy: { ...(rules().restBy || {}), [S.person]: patch } }, on ? `已加入休息日：${why}` : "已取消休息日");
   }
   function removePractice(pid) {
     const next = baseCfg(), t = today();
@@ -903,7 +910,7 @@ textarea.short { min-height: 76px; }
     e.preventDefault();
     const body = $("note-body").value.trim();
     if (!body) return;
-    const ok = await write("addNote", { role: noteAuthor(), body: sheetSafe(body) });
+    const ok = await write("addNote", { role: noteAuthor(), person: S.person, body: sheetSafe(body) });
     if (ok) { $("note-body").value = ""; toast("留言已送出"); }
   });
 

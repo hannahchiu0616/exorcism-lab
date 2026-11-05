@@ -11,7 +11,7 @@ const TABS = {
   "設定": ["項目", "值"],
   "打卡": ["日期", "完成項目", "實驗者"],
   "歷程": ["編號", "日期", "能量", "內容", "建立時間", "修改時間", "實驗者"],
-  "留言": ["編號", "內容", "建立時間", "身分"],
+  "留言": ["編號", "內容", "建立時間", "身分", "實驗者"],
 };
 
 const props = () => PropertiesService.getScriptProperties();
@@ -102,7 +102,7 @@ function snapshot(ss) {
       id: r[0], date: r[1], energy: r[2] ? Number(r[2]) : null, body: r[3],
       createdAt: Number(r[4]) || 0, editedAt: Number(r[5]) || 0, person: r[6] || PEOPLE[0],
     })),
-    notes: rows(ss, "留言").map(r => ({ id: r[0], body: r[1], createdAt: Number(r[2]) || 0, role: r[3] })),
+    notes: rows(ss, "留言").map(r => ({ id: r[0], body: r[1], createdAt: Number(r[2]) || 0, role: r[3], person: r[4] || PEOPLE[0] })),
   };
 }
 function parse(s, fallback) { try { return JSON.parse(s); } catch (e) { return fallback; } }
@@ -121,6 +121,12 @@ function text(s, max) {
   if (!t) throw appError("invalid", "內容不能是空的");
   return t;
 }
+function cleanRest(r) {
+  return {
+    restDays: (Array.isArray(r.restDays) ? r.restDays : []).filter(isDate).slice(0, 366),
+    restReasons: Object.keys(r.restReasons || {}).filter(isDate).slice(0, 366).reduce((o, d) => { o[d] = String(r.restReasons[d]).slice(0, 20); return o; }, {}),
+  };
+}
 function cleanCfg(c) {
   if (!c || !isDate(c.startDate)) throw appError("invalid", "開始日期不正確");
   const days = Math.round(Number(c.days));
@@ -132,8 +138,8 @@ function cleanCfg(c) {
     observers: (Array.isArray(c.observers) ? c.observers : []).map(n => String(n).trim().slice(0, 20)).filter(Boolean).slice(0, 20),
     rules: {
       weekdays: (Array.isArray(r.weekdays) ? r.weekdays : [1, 2, 3, 4, 5]).map(Number).filter(d => d >= 0 && d <= 6),
-      restDays: (Array.isArray(r.restDays) ? r.restDays : []).filter(isDate).slice(0, 366),
-      restReasons: Object.keys(r.restReasons || {}).filter(isDate).slice(0, 366).reduce((o, d) => { o[d] = String(r.restReasons[d]).slice(0, 20); return o; }, {}),
+      ...cleanRest(r),
+      restBy: Object.keys(r.restBy || {}).filter(n => PEOPLE.indexOf(n) >= 0).reduce((o, n) => { o[n] = cleanRest(r.restBy[n]); return o; }, {}),
       text: String(r.text == null ? "" : r.text).slice(0, 500),
     },
     practices: c.practices.map(p => ({
@@ -204,7 +210,7 @@ function applyWrite(ss, p) {
       return;
     case "addNote": {
       const sh = tab(ss, "留言"), role = String(p.role || "observer").slice(0, 20);
-      put(sh, sh.getLastRow() + 1, [Utilities.getUuid(), text(p.body, 3000), Date.now(), role]);
+      put(sh, sh.getLastRow() + 1, [Utilities.getUuid(), text(p.body, 3000), Date.now(), role, person(p.person)]);
       return;
     }
     case "deleteNote":
