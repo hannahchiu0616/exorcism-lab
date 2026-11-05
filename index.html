@@ -144,7 +144,7 @@ form { display: grid; gap: 12px; margin: 0; min-width: 0; }
 .matrix small { display: block; font-family: var(--body); font-size: 11px; color: var(--muted); font-weight: 400; }
 .matrix .name { position: sticky; left: 0; z-index: 1; min-width: 104px; max-width: 150px; padding-inline: 10px; text-align: left; white-space: normal; background: var(--surface); border-right: 1px solid var(--line); color: var(--ink); font-family: var(--body); }
 .matrix .off { color: var(--muted); background: var(--bg); font-size: 12px; }
-.mark { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 2px; background: var(--cinnabar); color: var(--on-cinnabar); font-family: var(--display); font-weight: 900; font-size: 14px; transform: rotate(-7deg); }
+.mark { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 2px; background: var(--cinnabar); color: var(--on-cinnabar); font-family: var(--body); font-weight: 700; font-size: 15px; }
 .miss { color: var(--muted); }
 .day.future { background: none; border-style: dashed; }
 .day.later { cursor: default; opacity: .6; }
@@ -351,6 +351,7 @@ textarea.short { min-height: 76px; }
     return r.weekdays.includes(weekdayOf(date)) ? "" : `週${WEEK[weekdayOf(date)]}休息`;
   };
   const activeOn = (date) => (restReason(date) ? [] : (S.cfg ? S.cfg.practices : []).filter((p) => applies(p, date)));
+  const practicesOn = (date) => (S.cfg ? S.cfg.practices : []).filter((p) => applies(p, date));
   const currentPractices = () => (S.cfg ? S.cfg.practices : []).filter((p) => !p.removedOn);
   const doneMap = (date) => (S.checkins[date] && S.checkins[date].done) || {};
   const dayScore = (date) => {
@@ -374,6 +375,7 @@ textarea.short { min-height: 76px; }
     let streak = 0;
     for (let i = dates.length - 1; i >= 0; i--) {
       const s = dayScore(dates[i]);
+      if (!s.total) continue; /* rest days neither extend nor break the run */
       const full = s.total > 0 && s.done === s.total;
       if (full) streak++;
       else if (dates[i] !== today()) break; /* today still in progress does not break the run */
@@ -523,19 +525,15 @@ textarea.short { min-height: 76px; }
     $("prev-day").disabled = sel <= S.cfg.startDate;
     $("next-day").disabled = sel >= end;
     $("go-today").hidden = isToday || today() > end;
-    const score = dayScore(sel), saved = doneMap(sel), picked = draftOf(sel);
-    const reason = restReason(sel);
-    $("day-label").textContent = `${prettyDate(sel)}　${dayLabel(sel)}` + (reason ? "" : `　已打卡 ${score.done} / ${score.total}`);
-    if (reason) {
-      g.append(h("p", { class: "empty" }, `${reason}，這天不用打卡。`));
-      g.append(h("p", { class: "muted" }, "要調整休息日，到「規則」分頁修改。"));
-      return;
-    }
-    const list = activeOn(sel), left = list.filter((p) => !saved[p.id]);
+    const saved = doneMap(sel), picked = draftOf(sel);
+    const reason = restReason(sel), list = practicesOn(sel), left = list.filter((p) => !saved[p.id]);
+    $("day-label").textContent = `${prettyDate(sel)}　${dayLabel(sel)}　已打卡 ${list.length - left.length} / ${list.length}`;
     const word = isToday ? "今天" : "這天";
-    g.append(left.length
-      ? h("div", { class: "remain" }, h("b", null, `${word}尚未完成 ${left.length} 項`), h("span", null, left.map((p) => p.name).join("、")))
-      : h("div", { class: "remain clear" }, h("b", null, `${word}的訂課全部完成`)));
+    g.append(reason
+      ? h("div", { class: "remain" }, h("b", null, `${reason}，不用打卡`), h("span", null, "有做的項目還是可以打卡。"))
+      : left.length
+        ? h("div", { class: "remain" }, h("b", null, `${word}尚未完成 ${left.length} 項`), h("span", null, left.map((p) => p.name).join("、")))
+        : h("div", { class: "remain clear" }, h("b", null, `${word}的訂課全部完成`)));
     const allPicked = list.every((p) => picked[p.id]);
     g.append(h("div", { class: "pracs" }, list.map((p) => {
       const locked = !!saved[p.id], isDone = !!picked[p.id];
@@ -582,10 +580,11 @@ textarea.short { min-height: 76px; }
       if (d < S.cfg.startDate || d > lastDay()) { cells.push(h("div", { class: "day outside" }, String(n))); continue; }
       const future = !started() || d > t;
       const s = dayScore(d), rest = !!restReason(d);
+      const extra = rest && practicesOn(d).some((p) => doneMap(d)[p.id]);
       const cls = rest ? "rest" : future ? "future" : s.total && s.done === s.total ? "full" : s.done ? "part" : "";
       cells.push(h("button", {
         class: `day ${cls}${future ? " later" : ""}${d === today() ? " today" : ""}`, type: "button", disabled: future,
-        "aria-label": `${prettyDate(d)}，第 ${dayNo(d)} 天，` + (rest ? restReason(d) : `完成 ${s.done} / ${s.total}`),
+        "aria-label": `${prettyDate(d)}，第 ${dayNo(d)} 天，` + (rest ? restReason(d) + (extra ? "，有打卡" : "") : `完成 ${s.done} / ${s.total}`),
         title: rest ? restReason(d) : prettyDate(d), on: { click: () => { S.selDate = d; location.hash = "checkin"; } },
       }, String(n)));
     }
@@ -598,12 +597,14 @@ textarea.short { min-height: 76px; }
     const body = S.cfg.practices.filter((p) => !p.removedOn || dates.some((d) => applies(p, d))).map((p) => {
       const due = dates.filter((d) => applies(p, d) && !restReason(d));
       const n = due.filter((d) => doneMap(d)[p.id]).length;
+      const bonus = dates.filter((d) => restReason(d) && applies(p, d) && doneMap(d)[p.id]).length;
       return h("tr", null,
-        h("th", { class: "name", scope: "row" }, p.name + (p.removedOn ? "（已移除）" : ""), h("small", null, `${n} / ${due.length} 天`)),
+        h("th", { class: "name", scope: "row" }, p.name + (p.removedOn ? "（已移除）" : ""), h("small", null, `${n} / ${due.length} 天` + (bonus ? `，休息日 +${bonus}` : ""))),
         dates.map((d) => {
-          if (restReason(d)) return h("td", { class: "off" }, "休");
           if (!applies(p, d)) return h("td", null, "");
-          return h("td", null, doneMap(d)[p.id] ? h("span", { class: "mark" }, "成") : h("span", { class: "miss", "aria-label": "未完成" }, "·"));
+          if (doneMap(d)[p.id]) return h("td", { class: restReason(d) ? "off" : null }, h("span", { class: "mark" }, "✓"));
+          if (restReason(d)) return h("td", { class: "off" }, "休");
+          return h("td", null, h("span", { class: "miss", "aria-label": "未完成" }, "·"));
         }));
     });
     $("matrix").replaceChildren(h("table", { class: "matrix" }, h("thead", null, head), h("tbody", null, body)));
@@ -675,7 +676,7 @@ textarea.short { min-height: 76px; }
   }
   function setAll(on) {
     const date = S.selDate, next = clone(draftOf(date));
-    for (const p of activeOn(date)) {
+    for (const p of practicesOn(date)) {
       if (doneMap(date)[p.id]) continue; /* saved check-ins stay locked */
       if (on) next[p.id] = true; else delete next[p.id];
     }
