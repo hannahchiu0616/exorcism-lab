@@ -75,7 +75,9 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 .icon-btn:disabled { opacity: .35; cursor: default; }
 .link { background: none; border: 0; padding: 0; color: var(--cinnabar); font-size: 14px; text-decoration: underline; text-underline-offset: 3px; }
 
-.pracs { display: grid; gap: 8px; }
+.pracs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; align-items: start; }
+.prac-col { display: grid; gap: 8px; min-width: 0; }
+@media (max-width: 559px) { .prac { gap: 10px; padding: 10px; } .prac .seal { width: 32px; height: 32px; font-size: 19px; } }
 .prac { display: flex; align-items: center; gap: 14px; width: 100%; padding: 12px 14px; text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: 4px; }
 .prac:disabled { cursor: default; }
 .prac-text { min-width: 0; overflow-wrap: anywhere; }
@@ -166,7 +168,6 @@ form { display: grid; gap: 12px; margin: 0; min-width: 0; }
 .day.rest { background: var(--line); color: var(--muted); border-color: transparent; }
 .legend .r { background: var(--line); border-color: transparent; }
 textarea.short { min-height: 76px; }
-@media (min-width: 560px) { .pracs { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(20px + env(safe-area-inset-bottom, 0px)); z-index: 20; max-width: calc(100vw - 32px); padding: 9px 16px; background: var(--ink); color: var(--bg); border-radius: 4px; font-size: 14px; }
 </style>
 </head>
@@ -361,6 +362,7 @@ textarea.short { min-height: 76px; }
   const PEOPLE = ["邱子芸", "江宇熙"];
   const DEFAULT_OBSERVERS = ["邱美琪", "張克強"];
   const LOCK_MSG = "這天已鎖定，只能從後台修改。";
+  const LEFT_PRACTICES = /接破曉|拳|嗯啊|光的冥想|大悲咒/;
   const DEFAULT_DAYS = 21;
   const DEFAULT_RULES = { weekdays: [1, 2, 3, 4, 5], restDays: [], restReasons: {}, text: "只做平日，見紅就休息" };
 
@@ -637,7 +639,7 @@ textarea.short { min-height: 76px; }
         ? h("div", { class: "remain" }, h("b", null, `${word}尚未完成 ${left.length} 項`), h("span", null, left.map((p) => p.name).join("、")))
         : h("div", { class: "remain clear" }, h("b", null, `${word}的定課全部完成`)));
     const allPicked = list.every((p) => picked[p.id]);
-    g.append(h("div", { class: "pracs" }, list.map((p) => {
+    const pracButton = (p) => {
       const locked = !!saved[p.id], isDone = !!picked[p.id];
       return h("button", {
         class: "prac" + (locked ? " locked" : closed ? " closed" : S.justStamped === p.id && isDone ? " stamp" : ""),
@@ -646,7 +648,11 @@ textarea.short { min-height: 76px; }
       },
         h("span", { class: "seal", "aria-hidden": "true" }, "✓"),
         h("span", { class: "prac-text" }, h("b", null, p.name), p.note ? h("small", null, p.note) : null, locked ? h("small", null, "已打卡") : null));
-    })));
+    };
+    const column = (items) => h("div", { class: "prac-col" }, items.map(pracButton));
+    g.append(h("div", { class: "pracs" },
+      column(list.filter((p) => LEFT_PRACTICES.test(p.name))),
+      column(list.filter((p) => !LEFT_PRACTICES.test(p.name)))));
     const changed = !sameDone(picked, saved);
     if (!closed) g.append(h("div", { class: "actions submit-row" },
       h("button", { class: "primary", id: "checkin-submit", type: "button", disabled: !changed || S.saving, on: { click: submitCheckin } },
