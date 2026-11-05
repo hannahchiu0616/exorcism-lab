@@ -190,7 +190,7 @@ function cleanCfg(c) {
   if (!c || !isDate(c.startDate)) throw appError("invalid", "開始日期不正確");
   const days = Math.round(Number(c.days));
   if (!(days >= 1 && days <= 365)) throw appError("invalid", "實驗天數請填 1 到 365");
-  if (!Array.isArray(c.practices) || c.practices.length > 100) throw appError("invalid", "訂課清單不正確");
+  if (!Array.isArray(c.practices) || c.practices.length > 100) throw appError("invalid", "定課清單不正確");
   const r = c.rules || {};
   return {
     startDate: c.startDate, days: days,

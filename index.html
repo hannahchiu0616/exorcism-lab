@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=LXGW+WenKai+TC&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@900&display=swap">
 <style>
-/* Layout: a talisman-yellow title band over a single-column lab notebook; ticks are cinnabar seals. */
+/* Layout: a quiet title bar with one cinnabar seal over a single-column lab notebook. */
 :root {
   --bg: #EEF0EA; --surface: #F9FAF6; --ink: #1D2A2A; --muted: #566462; --line: #CBD2C9;
   --cinnabar: #B92B1B; --on-cinnabar: #FFF6EC;
@@ -42,12 +42,14 @@ button, input, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
 :focus-visible { outline: 2px solid var(--cinnabar); outline-offset: 2px; }
 
-.band { background: var(--talisman); color: var(--on-talisman); }
-.band .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 8px 24px; padding-block: 28px 20px; }
-.band h1 { margin: 0; font-family: var(--display); font-weight: 900; font-size: clamp(34px, 9vw, 52px); line-height: 1.1; letter-spacing: .08em; color: var(--title); }
+.band { background: var(--surface); color: var(--ink); }
+.band .wrap { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding-block: 18px; }
+.brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.brand-seal { flex: none; width: 44px; height: 44px; display: grid; place-items: center; border-radius: 4px; background: var(--cinnabar); color: var(--on-cinnabar); font-family: var(--display); font-weight: 900; font-size: 26px; line-height: 1; }
+.band h1 { margin: 0; font-family: var(--display); font-weight: 700; font-size: clamp(22px, 5.5vw, 28px); line-height: 1.2; letter-spacing: .1em; color: var(--ink); }
 .role { margin: 6px 0 0; font-size: 14px; }
-.count { text-align: right; font-size: 14px; }
-.count b { display: block; font-family: var(--mono); font-size: 28px; line-height: 1.2; font-weight: 500; font-variant-numeric: tabular-nums; }
+.count { flex: none; text-align: right; font-size: 13px; color: var(--muted); }
+.count b { display: block; font-size: 18px; line-height: 1.3; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
 
 .tabs { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); }
 .login { display: grid; gap: 12px; margin: 14px 0 0; }
@@ -169,9 +171,12 @@ textarea.short { min-height: 76px; }
 
 <header class="band">
   <div class="wrap">
-    <div>
-      <h1>驅魔實驗室</h1>
-      <p class="role">訂課實驗紀錄</p>
+    <div class="brand">
+      <span class="brand-seal" aria-hidden="true">驅</span>
+      <div>
+        <h1>驅魔實驗室</h1>
+        <p class="role">定課實驗紀錄</p>
+      </div>
     </div>
     <div class="count" id="count"></div>
   </div>
@@ -229,7 +234,7 @@ textarea.short { min-height: 76px; }
       <div class="legend"><span><i class="f"></i>全部完成</span><span><i class="p"></i>部分完成</span><span><i></i>未打卡</span><span><i class="r"></i>休息</span></div>
     </div>
     <div class="group" id="matrix-group" hidden>
-      <h2>每項訂課的打卡紀錄</h2>
+      <h2>每項定課的打卡紀錄</h2>
       <div class="monthbar">
         <button class="icon-btn" id="prev-week" type="button" aria-label="上一週">‹</button>
         <b id="week-label"></b>
@@ -282,8 +287,8 @@ textarea.short { min-height: 76px; }
       <label class="field">規則內容<textarea id="rule-text" class="short" maxlength="500"></textarea></label>
     </div>
     <div class="group">
-      <h2>要做訂課的日子</h2>
-      <div class="picks" id="weekday-picks" role="group" aria-label="要做訂課的星期"></div>
+      <h2>要做定課的日子</h2>
+      <div class="picks" id="weekday-picks" role="group" aria-label="要做定課的星期"></div>
     </div>
     <div class="group">
       <h2>休息日</h2>
@@ -339,12 +344,12 @@ textarea.short { min-height: 76px; }
       </div>
     </div>
     <div class="group">
-      <h2>訂課清單</h2>
+      <h2>定課清單</h2>
       <ul class="edit-list" id="edit-list"></ul>
       <form id="add-form">
-        <label class="field">訂課名稱<input type="text" id="add-name" maxlength="60" required></label>
+        <label class="field">定課名稱<input type="text" id="add-name" maxlength="60" required></label>
         <label class="field">說明（選填，例如時間或次數）<input type="text" id="add-note" maxlength="120"></label>
-        <button class="primary" type="submit">加入訂課</button>
+        <button class="primary" type="submit">加入定課</button>
       </form>
     </div>
   </section>
@@ -553,7 +558,7 @@ textarea.short { min-height: 76px; }
     const t = today(), start = S.cfg.startDate;
     if (t < start) count.append(h("b", null, `${diffDays(t, start)} 天後`), "實驗開始");
     else if (t > lastDay()) count.append(h("b", null, `${S.cfg.days} 天`), "實驗已結束");
-    else count.append(h("b", null, `${dayNo(t)} / ${S.cfg.days}`), "實驗第幾天");
+    else count.append(h("b", null, `第 ${dayNo(t)} 天`), `共 ${S.cfg.days} 天`);
   }
   function renderTabs() {
     for (const v of VIEWS) {
@@ -609,7 +614,7 @@ textarea.short { min-height: 76px; }
     g.replaceChildren();
     if (!S.loaded) { g.append(h("p", { class: "empty" }, "正在讀取打卡紀錄……")); return; }
     if (!currentPractices().length) {
-      g.append(h("p", { class: "empty" }, "還沒有訂課。到「規則」分頁加入第一項訂課。"));
+      g.append(h("p", { class: "empty" }, "還沒有定課。到「規則」分頁加入第一項定課。"));
       return;
     }
     if (!started()) {
@@ -633,7 +638,7 @@ textarea.short { min-height: 76px; }
       ? h("div", { class: "remain" }, h("b", null, `${reason}，不用打卡`), h("span", null, "有做的項目還是可以打卡。"))
       : left.length
         ? h("div", { class: "remain" }, h("b", null, `${word}尚未完成 ${left.length} 項`), h("span", null, left.map((p) => p.name).join("、")))
-        : h("div", { class: "remain clear" }, h("b", null, `${word}的訂課全部完成`)));
+        : h("div", { class: "remain clear" }, h("b", null, `${word}的定課全部完成`)));
     const allPicked = list.every((p) => picked[p.id]);
     g.append(h("div", { class: "pracs" }, list.map((p) => {
       const locked = !!saved[p.id], isDone = !!picked[p.id];
@@ -657,7 +662,7 @@ textarea.short { min-height: 76px; }
     const hasPractices = S.loaded && !!S.cfg && S.cfg.practices.length > 0;
     const empty = $("overview-empty");
     empty.hidden = !S.loaded || hasPractices;
-    empty.textContent = "還沒有訂課，加入訂課後這裡會顯示打卡狀況。";
+    empty.textContent = "還沒有定課，加入定課後這裡會顯示打卡狀況。";
     $("progress-group").hidden = !hasPractices;
     $("matrix-group").hidden = !hasPractices || !started();
     if (!hasPractices) return;
@@ -700,7 +705,7 @@ textarea.short { min-height: 76px; }
     $("prev-week").disabled = S.week <= firstWeek;
     $("next-week").disabled = S.week >= lastWeek;
     const dates = week.filter((d) => started() && d >= S.cfg.startDate && d <= t);
-    const head = h("tr", null, h("th", { class: "name", scope: "col" }, "訂課"), week.map((d) => (
+    const head = h("tr", null, h("th", { class: "name", scope: "col" }, "定課"), week.map((d) => (
       h("th", { scope: "col", class: d === today() ? "now" : null }, short(d), h("small", null, `週${WEEK[weekdayOf(d)]}`))
     )));
     const body = S.cfg.practices.filter((p) => !p.removedOn || dates.some((d) => applies(p, d))).map((p) => {
@@ -858,7 +863,7 @@ textarea.short { min-height: 76px; }
   }
   function toggleWeekday(d) {
     const cur = rules().weekdays;
-    saveRules({ weekdays: cur.includes(d) ? cur.filter((x) => x !== d) : [...cur, d] }, "已更新要做訂課的日子");
+    saveRules({ weekdays: cur.includes(d) ? cur.filter((x) => x !== d) : [...cur, d] }, "已更新要做定課的日子");
   }
   function setRest(date, on, why) {
     const own = restOf(), cur = own.restDays.filter((d) => d !== date), restReasons = { ...own.restReasons };
@@ -985,7 +990,7 @@ textarea.short { min-height: 76px; }
       addedOn: Object.values(S.checkinsBy).some((c) => Object.keys(c).length) ? today() : null, removedOn: null,
     });
     $("add-name").value = ""; $("add-note").value = "";
-    saveCfg(next).then((ok) => ok && toast("已加入訂課"));
+    saveCfg(next).then((ok) => ok && toast("已加入定課"));
     $("add-name").focus();
   });
   function savePeriod() {
