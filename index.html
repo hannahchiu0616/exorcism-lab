@@ -52,7 +52,7 @@ button { cursor: pointer; }
 .tabs { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); }
 .login { display: grid; gap: 12px; margin: 14px 0 0; }
 .who { display: flex; justify-content: flex-end; align-items: center; gap: 12px; margin: 14px 0 0; font-size: 14px; color: var(--muted); }
-.readonly form, .readonly .edit-list button { display: none; }
+.readonly form:not(#my-pass-form), .readonly .edit-list button { display: none; }
 .people { display: flex; gap: 8px; margin: 14px 0 0; }
 .people button { flex: 1 1 0; max-width: 160px; padding: 9px 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 4px; font-weight: 500; color: var(--muted); }
 .people button[aria-pressed="true"] { background: var(--talisman); color: var(--on-talisman); border-color: transparent; font-weight: 700; }
@@ -193,6 +193,7 @@ textarea.short { min-height: 76px; }
   <form class="login" id="login-form" hidden>
     <h2>登入</h2>
     <p class="muted" id="login-hint"></p>
+    <p class="muted">第一次登入時，輸入的密碼就是你之後的密碼。</p>
     <div class="two">
       <label class="field">姓名<input type="text" id="login-name" maxlength="20" autocomplete="username" required></label>
       <label class="field">密碼<input type="password" id="login-pass" maxlength="60" autocomplete="current-password" required></label>
@@ -240,6 +241,7 @@ textarea.short { min-height: 76px; }
   </section>
 
   <section class="panel" id="view-journal" role="tabpanel" aria-labelledby="tab-journal" hidden>
+    <p class="muted" id="journal-observer" hidden>心路歷程只有實驗者本人能看。</p>
     <form id="journal-form">
       <h2 id="journal-heading">寫下今天的觀察</h2>
       <label class="field">日期<input type="date" id="journal-date" required></label>
@@ -251,7 +253,7 @@ textarea.short { min-height: 76px; }
         <button class="ghost" type="button" id="journal-cancel" hidden>取消編輯</button>
       </div>
     </form>
-    <div class="group">
+    <div class="group" id="journal-group">
       <h2>歷程紀錄</h2>
       <ol class="entries" id="journal-list"></ol>
       <p class="empty" id="journal-empty" hidden></p>
@@ -310,6 +312,11 @@ textarea.short { min-height: 76px; }
       </div>
     </div>
     <div class="group">
+      <form id="my-pass-form" hidden>
+        <h2>我的密碼</h2>
+        <label class="field">新密碼<input type="password" id="my-pass" minlength="4" maxlength="60" autocomplete="new-password" required></label>
+        <button class="primary" type="submit">更改密碼</button>
+      </form>
       <div id="account-group" class="group" hidden>
         <h2>帳號密碼</h2>
         <ul class="edit-list" id="account-list"></ul>
@@ -559,6 +566,7 @@ textarea.short { min-height: 76px; }
       list.length > 1 ? deleteButton("移除", () => setObservers(list.filter((x) => x !== n), "已移除觀察者")) : null)));
     const names = [...PEOPLE, ...list], select = $("account-name"), chosen = select.value;
     $("account-group").hidden = S.me !== PEOPLE[0];
+    $("my-pass-form").hidden = !S.me;
     $("account-list").replaceChildren(...names.map((n) => h("li", null, h("span", null, n), h("span", { class: "muted" }, S.hasPassword.includes(n) ? "已設定密碼" : "未設定"))));
     if (document.activeElement !== select) {
       select.replaceChildren(...names.map((n) => h("option", null, n)));
@@ -568,12 +576,12 @@ textarea.short { min-height: 76px; }
   const isObserver = () => !!S.me && !PEOPLE.includes(S.me);
   function renderPeople() {
     const bar = $("people"), buttons = () => PEOPLE.map((p) => h("button", { type: "button", "aria-pressed": String(p === S.person), on: { click: () => pickPerson(p) } }, p));
-    const gated = S.view === "notes" || S.view === "rules";
+    const gated = S.view === "notes" || S.view === "rules" || S.view === "journal";
     $("login-form").hidden = !gated || !!S.me;
     $("who-bar").hidden = !gated || !S.me;
     $("who-name").textContent = `已登入：${S.me}`;
-    $("login-hint").textContent = S.view === "notes" ? "登入後才看得到自己的留言。" : "規則大家都可以看，邱子芸登入後可以修改。";
-    bar.hidden = S.view === "rules" || (S.view === "notes" && !isObserver());
+    $("login-hint").textContent = S.view === "journal" ? "心路歷程只有本人能寫和看，請先登入。" : S.view === "notes" ? "登入後才看得到自己的留言。" : "規則大家都可以看，邱子芸登入後可以修改。";
+    bar.hidden = S.view === "rules" || S.view === "journal" || (S.view === "notes" && !isObserver());
     bar.replaceChildren(...buttons());
     $("rest-people").replaceChildren(...buttons());
   }
@@ -721,13 +729,17 @@ textarea.short { min-height: 76px; }
       deleteButton("移除", () => removePractice(p.id)))) : [h("li", { class: "muted" }, "清單是空的，用下方表單加入。")]));
     const admin = S.me === PEOPLE[0], panel = $("view-rules");
     panel.classList.toggle("readonly", !admin);
-    for (const el of panel.querySelectorAll("input, textarea, select, .picks button")) el.disabled = !admin;
+    for (const el of panel.querySelectorAll("input:not(#my-pass), textarea, select, .picks button")) el.disabled = !admin;
   }
   function renderJournal() {
     const dateInput = $("journal-date");
     dateInput.max = today();
     if (!dateInput.value) dateInput.value = today();
-    const list = S.journal.filter((e) => (e.person || PEOPLE[0]) === S.person).sort((a, b) => (b.date || "").localeCompare(a.date || "") || (b.createdAt || 0) - (a.createdAt || 0));
+    const mine = PEOPLE.includes(S.me);
+    $("journal-form").hidden = !mine;
+    $("journal-group").hidden = !mine;
+    $("journal-observer").hidden = !isObserver();
+    const list = [...S.journal].sort((a, b) => (b.date || "").localeCompare(a.date || "") || (b.createdAt || 0) - (a.createdAt || 0));
     $("journal-list").replaceChildren(...list.map((e) => {
       const meta = h("div", { class: "meta" }, h("b", null, prettyDate(e.date)), dayLabel(e.date) ? h("span", null, dayLabel(e.date)) : null);
       const acts = h("div", { class: "actions" },
@@ -920,8 +932,22 @@ textarea.short { min-height: 76px; }
     }
   });
   $("logout").addEventListener("click", () => {
-    setAuth(null); S.notes = []; S.hasPassword = []; lastRaw = ""; writes++;
+    setAuth(null); S.notes = []; S.journal = []; S.hasPassword = []; lastRaw = ""; writes++;
+    if (S.editing) resetJournal();
     render(); refresh();
+  });
+  $("my-pass-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    writes++;
+    try {
+      const d = await call("changePassword", { password: $("my-pass").value });
+      setAuth(d.session);
+      $("my-pass").value = "";
+      applyData(d.data);
+      toast("已更改密碼");
+    } catch (err) {
+      toast(err.code === "invalid" ? err.message : "更改失敗，請檢查網路後再試一次。");
+    }
   });
   $("account-form").addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -967,10 +993,10 @@ textarea.short { min-height: 76px; }
   $("journal-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const body = $("journal-body").value.trim(), date = $("journal-date").value;
-    if (!body || !date || needsBackendUpdate()) return;
+    if (!body || !date) return;
     const submit = $("journal-submit");
     submit.disabled = true;
-    const ok = await write("saveJournal", { id: S.editing, person: S.person, date, body: sheetSafe(body) });
+    const ok = await write("saveJournal", { id: S.editing, date, body: sheetSafe(body) });
     submit.disabled = false;
     if (ok) { resetJournal(); toast("已儲存紀錄"); }
   });

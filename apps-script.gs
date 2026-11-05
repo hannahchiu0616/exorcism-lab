@@ -51,6 +51,10 @@ function whoIs(ss, auth) {
   if (users(ss).indexOf(name) < 0 || !props().getProperty("pw:" + name) || !(exp > Date.now())) return "";
   return makeToken(name, exp) === auth.token ? name : "";
 }
+function makeSession(name) {
+  const exp = Date.now() + 120 * 86400000;
+  return { name: name, token: makeToken(name, exp) };
+}
 function login(ss, p) {
   const name = String(p.name || "").trim().slice(0, 40), password = String(p.password || "");
   const cache = CacheService.getScriptCache(), key = "fail:" + name, fails = Number(cache.get(key)) || 0;
@@ -61,14 +65,11 @@ function login(ss, p) {
   if (saved) {
     const [salt, hash] = saved.split(":");
     if (hashPassword(password, salt) !== hash) throw bad();
-  } else if (name === ADMIN) {
-    setPassword(name, password); // 邱子芸第一次登入時設定自己的密碼
   } else {
-    throw appError("invalid", "還沒設定密碼，請邱子芸到規則頁設定");
+    setPassword(name, password); // 第一次登入時自己設定密碼
   }
   cache.remove(key);
-  const exp = Date.now() + 120 * 86400000;
-  return { name: name, token: makeToken(name, exp) };
+  return makeSession(name);
 }
 // 實驗者看寫給自己的留言，觀察者看自己寫的留言
 const canSeeNote = (n, me) => !!me && (PEOPLE.indexOf(me) >= 0 ? n.person === me : n.role === me);
@@ -137,10 +138,6 @@ function findCheckin(sh, date, who) {
 function upsert(sh, key, values) {
   put(sh, findRow(sh, key) || sh.getLastRow() + 1, values);
 }
-function removeRow(sh, key) {
-  const row = findRow(sh, key);
-  if (row) sh.deleteRow(row);
-}
 
 function snapshot(ss, me) {
   const settings = {};
@@ -158,7 +155,7 @@ function snapshot(ss, me) {
     journal: rows(ss, "歷程").map(r => ({
       id: r[0], date: r[1], energy: r[2] ? Number(r[2]) : null, body: r[3],
       createdAt: Number(r[4]) || 0, editedAt: Number(r[5]) || 0, person: r[6] || PEOPLE[0],
-    })),
+    })).filter(e => e.person === me),
     notes: rows(ss, "留言").map(r => ({ id: r[0], body: r[1], createdAt: Number(r[2]) || 0, role: r[3], person: r[4] || PEOPLE[0] }))
       .filter(n => canSeeNote(n, me)),
     me: me || null,
@@ -231,6 +228,12 @@ function doPost(e) {
         const session = login(ss, p);
         return out({ ok: true, session: session, data: snapshot(ss, session.name) });
       }
+      if (p.action === "changePassword") {
+        const name = whoIs(ss, p.auth);
+        if (!name) throw appError("invalid", "請先登入");
+        setPassword(name, p.password);
+        return out({ ok: true, session: makeSession(name), data: snapshot(ss, name) });
+      }
       applyWrite(ss, p, whoIs(ss, p.auth));
       SpreadsheetApp.flush();
       return out({ ok: true, data: snapshot(ss, whoIs(ss, p.auth)) });
@@ -240,6 +243,14 @@ function doPost(e) {
   } catch (err) {
     return out({ ok: false, code: err.appCode || "server", error: err.message });
   }
+}
+
+// 心路歷程只有實驗者本人能寫和看
+function ownJournalRow(sh, id, me) {
+  if (PEOPLE.indexOf(me) < 0) throw appError("invalid", "請用實驗者本人的帳號登入");
+  const row = findRow(sh, String(id));
+  if (row && (String(sh.getRange(row, 7).getValue()) || PEOPLE[0]) !== me) throw appError("invalid", "只能修改自己的紀錄");
+  return row;
 }
 
 function applyWrite(ss, p, me) {
@@ -263,21 +274,21 @@ function applyWrite(ss, p, me) {
       return;
     case "saveJournal": {
       if (!isDate(p.date)) throw appError("invalid", "日期不正確");
-      const sh = tab(ss, "歷程"), body = text(p.body, 5000), now = Date.now(), who = person(p.person);
-      const energy = [1, 2, 3, 4, 5].indexOf(Number(p.energy)) >= 0 ? Number(p.energy) : "";
+      const sh = tab(ss, "歷程"), row = ownJournalRow(sh, p.id, me), body = text(p.body, 5000), now = Date.now();
       if (p.id) {
-        const row = findRow(sh, String(p.id));
         if (!row) throw appError("invalid", "找不到這筆紀錄");
         const created = String(sh.getRange(row, 5).getValue());
-        put(sh, row, [p.id, p.date, energy, body, created, now, who]);
+        put(sh, row, [p.id, p.date, "", body, created, now, me]);
       } else {
-        put(sh, sh.getLastRow() + 1, [Utilities.getUuid(), p.date, energy, body, now, "", who]);
+        put(sh, sh.getLastRow() + 1, [Utilities.getUuid(), p.date, "", body, now, "", me]);
       }
       return;
     }
-    case "deleteJournal":
-      removeRow(tab(ss, "歷程"), String(p.id));
+    case "deleteJournal": {
+      const sh = tab(ss, "歷程"), row = ownJournalRow(sh, p.id, me);
+      if (row) sh.deleteRow(row);
       return;
+    }
     case "addNote": {
       if (!me || PEOPLE.indexOf(me) >= 0) throw appError("invalid", "請用觀察者身分登入後留言");
       const sh = tab(ss, "留言");
