@@ -1,10 +1,9 @@
 // 驅魔實驗室後端
-// 資料存在部署者自己 Google 雲端硬碟裡的一份試算表；通行碼存在指令碼屬性，不在這份程式碼裡。
+// 資料存在部署者自己 Google 雲端硬碟裡的一份試算表。網站公開，不需要登入。
 // 安裝：
 //   1. 到 script.google.com 建立新專案，貼上這整段，存檔
-//   2. 上方函式選 setup → 執行 → 授權 → 從執行記錄抄下兩組通行碼
+//   2. 上方函式選 setup → 執行 → 授權
 //   3. 部署 → 新增部署作業 → 網頁應用程式 → 執行身分「我」、存取權「所有人」→ 部署 → 複製網址
-// 忘記通行碼：執行 setup 會再顯示一次。要換通行碼：執行 resetCodes。
 
 const TABS = {
   "設定": ["項目", "值"],
@@ -12,8 +11,6 @@ const TABS = {
   "歷程": ["編號", "日期", "能量", "內容", "建立時間", "修改時間"],
   "留言": ["編號", "內容", "建立時間", "身分"],
 };
-const ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
-const MAX_FAILS = 20;
 
 const props = () => PropertiesService.getScriptProperties();
 
@@ -27,22 +24,7 @@ function setup() {
     const first = ss.getSheetByName("工作表1") || ss.getSheetByName("Sheet1");
     if (first) ss.deleteSheet(first);
   }
-  if (!p.getProperty("codeExperimenter")) resetCodes();
-  else printCodes();
-}
-function resetCodes() {
-  props().setProperty("codeExperimenter", newCode());
-  props().setProperty("codeObserver", newCode());
-  printCodes();
-}
-function printCodes() {
-  Logger.log("實驗者通行碼：" + props().getProperty("codeExperimenter"));
-  Logger.log("觀察者通行碼：" + props().getProperty("codeObserver"));
-}
-function newCode() {
-  let s = "";
-  for (let i = 0; i < 10; i++) s += ALPHABET[Math.floor(Math.random() * ALPHABET.length)];
-  return s;
+  Logger.log("試算表：" + SpreadsheetApp.openById(p.getProperty("sheetId")).getUrl());
 }
 
 /* ---------- 試算表 ---------- */
@@ -130,42 +112,23 @@ function cleanDone(d) {
   Object.keys(d || {}).slice(0, 100).forEach(k => { if (d[k]) o[String(k).slice(0, 40)] = true; });
   return o;
 }
-function roleOf(code) {
-  const p = props(), c = String(code || "").trim().toUpperCase();
-  if (c && c === p.getProperty("codeExperimenter")) return "experimenter";
-  if (c && c === p.getProperty("codeObserver")) return "observer";
-  return "";
-}
-// 擋亂試通行碼：全站 10 分鐘內錯太多次就暫停
-function checkRole(code) {
-  const cache = CacheService.getScriptCache();
-  const fails = Number(cache.get("fails") || 0);
-  if (fails >= MAX_FAILS) throw appError("too_many", "嘗試太多次，請 10 分鐘後再試");
-  const role = roleOf(code);
-  if (!role) {
-    cache.put("fails", String(fails + 1), 600);
-    throw appError("bad_code", "通行碼不正確");
-  }
-  return role;
-}
 
 /* ---------- 網址入口 ---------- */
 function out(obj) { return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON); }
 
-function doGet() { return out({ ok: true, service: "exorcism-lab" }); } // 只回報服務在線，不含紀錄
+function doGet() { return out({ ok: true, service: "exorcism-lab" }); }
 
 function doPost(e) {
   try {
     const p = JSON.parse(e.postData.contents);
-    const role = checkRole(p.code);
-    if (p.action === "getAll") return out({ ok: true, role: role, data: snapshot(book()) });
+    if (p.action === "getAll") return out({ ok: true, data: snapshot(book()) });
     const lock = LockService.getScriptLock();
     lock.waitLock(20000);
     try {
       const ss = book();
-      applyWrite(ss, p, role);
+      applyWrite(ss, p);
       SpreadsheetApp.flush();
-      return out({ ok: true, role: role, data: snapshot(ss) });
+      return out({ ok: true, data: snapshot(ss) });
     } finally {
       lock.releaseLock();
     }
@@ -174,21 +137,16 @@ function doPost(e) {
   }
 }
 
-function applyWrite(ss, p, role) {
-  const exp = role === "experimenter";
-  const expOnly = () => { if (!exp) throw appError("forbidden", "這個動作只有實驗者能做"); };
+function applyWrite(ss, p) {
   switch (p.action) {
     case "saveConfig":
-      expOnly();
       upsert(tab(ss, "設定"), "實驗", ["實驗", JSON.stringify(cleanCfg(p.cfg))]);
       return;
     case "setCheckin":
-      expOnly();
       if (!isDate(p.date)) throw appError("invalid", "日期不正確");
       upsert(tab(ss, "打卡"), p.date, [p.date, JSON.stringify(cleanDone(p.done))]);
       return;
     case "saveJournal": {
-      expOnly();
       if (!isDate(p.date)) throw appError("invalid", "日期不正確");
       const sh = tab(ss, "歷程"), body = text(p.body, 5000), now = Date.now();
       const energy = [1, 2, 3, 4, 5].indexOf(Number(p.energy)) >= 0 ? Number(p.energy) : "";
@@ -203,19 +161,16 @@ function applyWrite(ss, p, role) {
       return;
     }
     case "deleteJournal":
-      expOnly();
       removeRow(tab(ss, "歷程"), String(p.id));
       return;
-    case "addNote":
-      put(tab(ss, "留言"), tab(ss, "留言").getLastRow() + 1, [Utilities.getUuid(), text(p.body, 3000), Date.now(), role]);
-      return;
-    case "deleteNote": {
-      const sh = tab(ss, "留言"), row = findRow(sh, String(p.id));
-      if (!row) return;
-      if (!exp && String(sh.getRange(row, 4).getValue()) !== role) throw appError("forbidden", "只能刪除自己的留言");
-      sh.deleteRow(row);
+    case "addNote": {
+      const sh = tab(ss, "留言"), role = p.role === "experimenter" ? "experimenter" : "observer";
+      put(sh, sh.getLastRow() + 1, [Utilities.getUuid(), text(p.body, 3000), Date.now(), role]);
       return;
     }
+    case "deleteNote":
+      removeRow(tab(ss, "留言"), String(p.id));
+      return;
     default:
       throw appError("invalid", "不支援的動作");
   }
