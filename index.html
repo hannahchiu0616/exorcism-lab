@@ -147,6 +147,7 @@ form { display: grid; gap: 12px; margin: 0; min-width: 0; }
 .matrix .off { color: var(--muted); background: var(--bg); font-size: 12px; }
 .mark { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 2px; background: var(--cinnabar); color: var(--on-cinnabar); font-family: var(--body); font-weight: 700; font-size: 15px; }
 .miss { color: var(--muted); }
+.cross { color: var(--cinnabar); font-weight: 700; font-size: 16px; }
 .day.future { background: none; border-style: dashed; }
 .day.later { cursor: default; opacity: .6; }
 .day.rest { background: var(--line); color: var(--muted); border-color: transparent; }
@@ -215,6 +216,7 @@ textarea.short { min-height: 76px; }
         <button class="icon-btn" id="next-week" type="button" aria-label="下一週">›</button>
       </div>
       <div class="table-wrap" id="matrix"></div>
+      <p class="muted">✓ 完成　✕ 隔天中午 12 點前未打卡　休 休息　- 還沒到</p>
     </div>
   </section>
 
@@ -357,6 +359,8 @@ textarea.short { min-height: 76px; }
   };
   const activeOn = (date) => (restReason(date) ? [] : (S.cfg ? S.cfg.practices : []).filter((p) => applies(p, date)));
   const practicesOn = (date) => (S.cfg ? S.cfg.practices : []).filter((p) => applies(p, date));
+  /* a day counts as missed once noon of the following day has passed */
+  const overdue = (s) => { const [y, m, d] = parts(s); return Date.now() >= new Date(y, m - 1, d + 1, 12).getTime(); };
   const currentPractices = () => (S.cfg ? S.cfg.practices : []).filter((p) => !p.removedOn);
   const doneMap = (date) => (S.checkins[date] && S.checkins[date].done) || {};
   const dayScore = (date) => {
@@ -615,11 +619,12 @@ textarea.short { min-height: 76px; }
       return h("tr", null,
         h("th", { class: "name", scope: "row" }, p.name + (p.removedOn ? "（已移除）" : ""), h("small", null, `${n} / ${due.length} 天` + (bonus ? `，休息日 +${bonus}` : ""))),
         week.map((d) => {
-          if (!dates.includes(d)) return h("td", null, "");
-          if (!applies(p, d)) return h("td", null, "");
+          if (d < S.cfg.startDate || d > lastDay() || !applies(p, d)) return h("td", null, "");
           if (doneMap(d)[p.id]) return h("td", { class: restReason(d) ? "off" : null }, h("span", { class: "mark" }, "✓"));
           if (restReason(d)) return h("td", { class: "off" }, "休");
-          return h("td", null, h("span", { class: "miss", "aria-label": "未完成" }, "·"));
+          return h("td", null, overdue(d)
+            ? h("span", { class: "cross", "aria-label": "未完成" }, "✕")
+            : h("span", { class: "miss", "aria-label": "還沒到" }, "-"));
         }));
     });
     $("matrix").replaceChildren(h("table", { class: "matrix" }, h("thead", null, head), h("tbody", null, body)));
