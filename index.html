@@ -233,11 +233,6 @@ textarea.short { min-height: 76px; }
   <section class="panel" id="view-notes" role="tabpanel" aria-labelledby="tab-notes" hidden>
     <form id="note-form">
       <h2>留下一則留言</h2>
-      <div class="energy who" id="note-role" role="group" aria-label="留言身分">
-        <span>我是</span>
-        <button type="button" data-r="observer" aria-pressed="true">觀察者</button>
-        <button type="button" data-r="experimenter" aria-pressed="false">實驗者</button>
-      </div>
       <label class="field">留言內容
         <textarea id="note-body" maxlength="3000" required placeholder="這段時間你看到了什麼變化？"></textarea>
       </label>
@@ -297,15 +292,10 @@ textarea.short { min-height: 76px; }
   const DEFAULT_RULES = { weekdays: [1, 2, 3, 4, 5], restDays: [], text: "只做平日，見紅就休息" };
 
   const API = "https://script.google.com/macros/s/AKfycbyHMXCObmXzh1VNL9aL0vl6xC8JHrlRmGY83uN88fDpYnO5roRPZfF3bfiQYEmc-ccr/exec"; /* Apps Script 網頁應用程式網址 */
-  const ROLE_KEY = "exorcism-lab-role";
   const POLL_MS = 30000;
-  const saved = {
-    get() { try { return localStorage.getItem(ROLE_KEY) || ""; } catch (e) { return ""; } },
-    set(v) { try { localStorage.setItem(ROLE_KEY, v); } catch (e) {} },
-  };
 
   const S = {
-    loaded: false, noteRole: "observer", drafts: {}, saving: false,
+    loaded: false, drafts: {}, saving: false,
     cfg: null, checkins: {}, journal: [], notes: [],
     view: "checkin", selDate: null, justStamped: null, editing: null, energy: null,
   };
@@ -624,10 +614,8 @@ textarea.short { min-height: 76px; }
     const list = [...S.notes].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
     $("note-list").replaceChildren(...list.map((n) => {
       const date = n.createdAt ? toIso(new Date(n.createdAt)) : null;
-      const isExp = n.role === "experimenter";
       return h("li", { class: "entry" },
         h("div", { class: "meta" },
-          h("span", { class: "pill" + (isExp ? " me" : "") }, isExp ? "實驗者" : "觀察者"),
           n.createdAt ? h("span", null, stamp(n.createdAt)) : null,
           date && dayLabel(date) ? h("span", null, dayLabel(date)) : null),
         h("p", { class: "text" }, n.body),
@@ -786,20 +774,11 @@ textarea.short { min-height: 76px; }
     e.preventDefault();
     const body = $("note-body").value.trim();
     if (!body) return;
-    const ok = await write("addNote", { body: sheetSafe(body), role: S.noteRole });
+    const ok = await write("addNote", { body: sheetSafe(body) });
     if (ok) { $("note-body").value = ""; toast("留言已送出"); }
   });
 
   /* ---- start ---- */
-  function setNoteRole(r) {
-    S.noteRole = r === "experimenter" ? "experimenter" : "observer";
-    for (const b of $("note-role").querySelectorAll("button")) b.setAttribute("aria-pressed", String(b.dataset.r === S.noteRole));
-  }
-  $("note-role").addEventListener("click", (e) => {
-    const b = e.target.closest("button"); if (!b) return;
-    setNoteRole(b.dataset.r); saved.set(S.noteRole);
-  });
-  setNoteRole(saved.get());
   routeFromHash();
   render();
   if (!API) {
