@@ -90,6 +90,9 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 .stats dd { margin: 0; font-family: var(--mono); font-size: 24px; font-variant-numeric: tabular-nums; }
 .days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; max-width: 420px; }
 .day { aspect-ratio: 1; max-width: 100%; padding: 0; border: 1px solid var(--line); border-radius: 3px; background: var(--surface); font-family: var(--mono); font-size: 13px; color: var(--muted); }
+.monthbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; max-width: 420px; }
+.monthbar b { font-size: 17px; }
+.day.outside { display: grid; place-items: center; background: none; border: 0; opacity: .35; }
 .dow { padding-block: 2px; text-align: center; font-size: 13px; color: var(--muted); }
 .day.today { outline: 2px solid var(--ink); outline-offset: 1px; }
 .day.part { background: var(--talisman-soft); color: var(--on-talisman); border-color: transparent; }
@@ -195,6 +198,11 @@ textarea.short { min-height: 76px; }
     <div class="group" id="progress-group" hidden>
       <h2>實驗進度</h2>
       <dl class="stats" id="stats"></dl>
+      <div class="monthbar">
+        <button class="icon-btn" id="prev-month" type="button" aria-label="上個月">‹</button>
+        <b id="month-label"></b>
+        <button class="icon-btn" id="next-month" type="button" aria-label="下個月">›</button>
+      </div>
       <div class="days" id="days"></div>
       <div class="legend"><span><i class="f"></i>全部完成</span><span><i class="p"></i>部分完成</span><span><i></i>未打卡</span><span><i class="r"></i>休息</span></div>
     </div>
@@ -306,7 +314,7 @@ textarea.short { min-height: 76px; }
   const POLL_MS = 30000;
 
   const S = {
-    loaded: false, drafts: {}, saving: false,
+    loaded: false, drafts: {}, saving: false, month: null,
     cfg: null, checkins: {}, journal: [], notes: [],
     view: "checkin", selDate: null, justStamped: null, editing: null, energy: null,
   };
@@ -557,17 +565,28 @@ textarea.short { min-height: 76px; }
     const st = computeStats();
     $("stats").replaceChildren(...[["全部完成", `${st.fullDays} 天`], ["目前連續", `${st.streak} 天`], ["總完成率", `${st.rate}%`]]
       .map(([k, v]) => h("div", null, h("dt", null, k), h("dd", null, v))));
-    const t = lastElapsed(), cells = WEEK.map((w) => h("div", { class: "dow" }, w));
-    for (let i = weekdayOf(S.cfg.startDate); i > 0; i--) cells.push(h("div", { "aria-hidden": "true" }));
-    for (let i = 0; i < S.cfg.days; i++) {
-      const d = addDays(S.cfg.startDate, i), future = !started() || d > t;
+    const t = lastElapsed(), firstMonth = S.cfg.startDate.slice(0, 7), lastMonth = lastDay().slice(0, 7);
+    if (!S.month) S.month = today().slice(0, 7);
+    if (S.month < firstMonth) S.month = firstMonth;
+    if (S.month > lastMonth) S.month = lastMonth;
+    const [year, month] = S.month.split("-").map(Number);
+    $("month-label").textContent = `${year} 年 ${month} 月`;
+    $("prev-month").disabled = S.month <= firstMonth;
+    $("next-month").disabled = S.month >= lastMonth;
+    const cells = WEEK.map((w) => h("div", { class: "dow" }, w));
+    for (let i = weekdayOf(`${S.month}-01`); i > 0; i--) cells.push(h("div", { "aria-hidden": "true" }));
+    const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    for (let n = 1; n <= daysInMonth; n++) {
+      const d = `${S.month}-${pad(n)}`;
+      if (d < S.cfg.startDate || d > lastDay()) { cells.push(h("div", { class: "day outside" }, String(n))); continue; }
+      const future = !started() || d > t;
       const s = dayScore(d), rest = !!restReason(d);
       const cls = rest ? "rest" : future ? "future" : s.total && s.done === s.total ? "full" : s.done ? "part" : "";
       cells.push(h("button", {
         class: `day ${cls}${future ? " later" : ""}${d === today() ? " today" : ""}`, type: "button", disabled: future,
-        "aria-label": `第 ${i + 1} 天，${prettyDate(d)}，` + (rest ? "休息" : `完成 ${s.done} / ${s.total}`),
-        title: prettyDate(d), on: { click: () => { S.selDate = d; location.hash = "checkin"; } },
-      }, i === 0 || parts(d)[2] === 1 ? `${parts(d)[1]}/${parts(d)[2]}` : String(parts(d)[2])));
+        "aria-label": `${prettyDate(d)}，第 ${dayNo(d)} 天，` + (rest ? restReason(d) : `完成 ${s.done} / ${s.total}`),
+        title: rest ? restReason(d) : prettyDate(d), on: { click: () => { S.selDate = d; location.hash = "checkin"; } },
+      }, String(n)));
     }
     $("days").replaceChildren(...cells);
     const dates = elapsedDates().reverse();
@@ -730,6 +749,13 @@ textarea.short { min-height: 76px; }
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) { render(); refresh(); }
   });
+  function shiftMonth(by) {
+    const [y, m] = S.month.split("-").map(Number), x = new Date(Date.UTC(y, m - 1 + by, 1));
+    S.month = `${x.getUTCFullYear()}-${pad(x.getUTCMonth() + 1)}`;
+    render();
+  }
+  $("prev-month").addEventListener("click", () => shiftMonth(-1));
+  $("next-month").addEventListener("click", () => shiftMonth(1));
   $("prev-day").addEventListener("click", () => { S.selDate = addDays(S.selDate, -1); render(); });
   $("next-day").addEventListener("click", () => { S.selDate = addDays(S.selDate, 1); render(); });
   $("go-today").addEventListener("click", () => { S.selDate = today(); render(); });
