@@ -198,7 +198,6 @@ textarea.short { min-height: 76px; }
       <label class="field">姓名<select id="login-name" required></select></label>
       <label class="field">密碼<input type="password" id="login-pass" maxlength="60" autocomplete="current-password" required></label>
     </div>
-    <label class="field" id="login-observer-field" hidden>觀察者姓名<select id="login-observer"></select></label>
     <button class="primary" type="submit">登入</button>
   </form>
   <p class="who" id="who-bar" hidden><span id="who-name"></span><button class="link" id="logout" type="button">登出</button></p>
@@ -568,11 +567,6 @@ textarea.short { min-height: 76px; }
     $("observer-list").replaceChildren(...list.map((n) => h("li", null, h("span", null, n),
       list.length > 1 ? deleteButton("移除", () => setObservers(list.filter((x) => x !== n), "已移除觀察者")) : null)));
     const names = [...PEOPLE, ...list], select = $("account-name"), chosen = select.value;
-    const loginObserver = $("login-observer"), picked = loginObserver.value;
-    if (document.activeElement !== loginObserver) {
-      loginObserver.replaceChildren(h("option", { value: "" }, "請選擇觀察者"), ...list.map((n) => h("option", null, n)));
-      loginObserver.value = list.includes(picked) ? picked : "";
-    }
     $("account-group").hidden = S.me !== PEOPLE[0];
     $("my-pass-form").hidden = !S.me;
     $("account-list").replaceChildren(...names.map((n) => h("li", null, h("span", null, n), h("span", { class: "muted" }, S.hasPassword.includes(n) ? "已設定密碼" : "未設定"))));
@@ -585,6 +579,12 @@ textarea.short { min-height: 76px; }
   function renderPeople() {
     const bar = $("people"), buttons = () => PEOPLE.map((p) => h("button", { type: "button", "aria-pressed": String(p === S.person), on: { click: () => pickPerson(p) } }, p));
     const gated = S.view === "notes" || S.view === "rules" || S.view === "journal";
+    const menu = $("login-name"), chosen = menu.value;
+    const names = S.view === "journal" ? PEOPLE : S.view === "notes" ? observers() : [...PEOPLE, ...observers()];
+    if (document.activeElement !== menu) {
+      menu.replaceChildren(h("option", { value: "" }, "請選擇姓名"), ...names.map((n) => h("option", null, n)));
+      menu.value = names.includes(chosen) ? chosen : "";
+    }
     $("login-form").hidden = !gated || !!S.me;
     $("who-bar").hidden = !gated || !S.me;
     $("who-name").textContent = `已登入：${S.me}`;
@@ -926,20 +926,12 @@ textarea.short { min-height: 76px; }
     if (d) { setRest(d, true, why); $("rest-date").value = ""; $("rest-other").value = ""; }
   });
 
-  $("login-name").append(h("option", { value: "" }, "請選擇姓名"), ...PEOPLE.map((p) => h("option", null, p)), h("option", { value: "observer" }, "觀察者"));
-  $("login-name").addEventListener("change", (e) => {
-    const on = e.target.value === "observer";
-    $("login-observer-field").hidden = !on;
-    $("login-observer").required = on;
-  });
   $("login-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     if (S.loaded && !S.multi) { toast("請先更新 Google 後端。"); return; }
     writes++;
     try {
-      const asObserver = $("login-name").value === "observer";
-      const name = asObserver ? $("login-observer").value : $("login-name").value;
-      const d = await call("login", { name, password: $("login-pass").value });
+      const d = await call("login", { name: $("login-name").value, password: $("login-pass").value });
       setAuth(d.session);
       $("login-pass").value = "";
       applyData(d.data);
