@@ -195,7 +195,7 @@ textarea.short { min-height: 76px; }
     <p class="muted" id="login-hint"></p>
     <p class="muted">第一次登入時，輸入的密碼就是你之後的密碼。</p>
     <div class="two">
-      <label class="field">姓名<input type="text" id="login-name" maxlength="20" autocomplete="username" required></label>
+      <label class="field">姓名<select id="login-name" required></select></label>
       <label class="field">密碼<input type="password" id="login-pass" maxlength="60" autocomplete="current-password" required></label>
     </div>
     <button class="primary" type="submit">登入</button>
@@ -566,6 +566,11 @@ textarea.short { min-height: 76px; }
     $("observer-list").replaceChildren(...list.map((n) => h("li", null, h("span", null, n),
       list.length > 1 ? deleteButton("移除", () => setObservers(list.filter((x) => x !== n), "已移除觀察者")) : null)));
     const names = [...PEOPLE, ...list], select = $("account-name"), chosen = select.value;
+    const loginName = $("login-name"), picked = loginName.value;
+    if (document.activeElement !== loginName) {
+      loginName.replaceChildren(h("option", { value: "" }, "請選擇姓名"), ...names.map((n) => h("option", null, n)));
+      loginName.value = names.includes(picked) ? picked : "";
+    }
     $("account-group").hidden = S.me !== PEOPLE[0];
     $("my-pass-form").hidden = !S.me;
     $("account-list").replaceChildren(...names.map((n) => h("li", null, h("span", null, n), h("span", { class: "muted" }, S.hasPassword.includes(n) ? "已設定密碼" : "未設定"))));
