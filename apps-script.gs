@@ -8,6 +8,7 @@
 const PEOPLE = ["邱子芸", "江宇熙"];
 const ADMIN = PEOPLE[0];
 const DEFAULT_OBSERVERS = ["邱美琪", "張克強"];
+const NEVER = "2000-01-01"; // 定課的 by[人].to 設成這天，代表這個人從沒做過
 
 const TABS = {
   "設定": ["項目", "值"],
@@ -186,6 +187,12 @@ function cleanRest(r) {
     restReasons: Object.keys(r.restReasons || {}).filter(isDate).slice(0, 366).reduce((o, d) => { o[d] = String(r.restReasons[d]).slice(0, 20); return o; }, {}),
   };
 }
+function cleanBy(b) {
+  return Object.keys(b || {}).filter(n => PEOPLE.indexOf(n) >= 0 && b[n]).reduce((o, n) => {
+    o[n] = { from: isDate(b[n].from) ? b[n].from : null, to: isDate(b[n].to) ? b[n].to : null };
+    return o;
+  }, {});
+}
 function cleanCfg(c) {
   if (!c || !isDate(c.startDate)) throw appError("invalid", "開始日期不正確");
   const days = Math.round(Number(c.days));
@@ -204,6 +211,7 @@ function cleanCfg(c) {
     practices: c.practices.map(p => ({
       id: text(p.id, 40), name: text(p.name, 60), note: String(p.note || "").slice(0, 120),
       addedOn: isDate(p.addedOn) ? p.addedOn : null, removedOn: isDate(p.removedOn) ? p.removedOn : null,
+      by: cleanBy(p.by),
     })),
   };
 }
@@ -255,11 +263,47 @@ function ownJournalRow(sh, id, me) {
   return row;
 }
 
+function readCfg(ss) {
+  const row = rows(ss, "設定").filter(r => r[0] === "實驗")[0];
+  return row ? parse(row[1], null) : null;
+}
+// 每位實驗者只改自己的定課；邱子芸也可以代改
+function saveMenu(ss, p, me) {
+  const who = p.person;
+  if (PEOPLE.indexOf(who) < 0) throw appError("invalid", "找不到這位實驗者");
+  if (me !== who && me !== ADMIN) throw appError("invalid", "只能修改自己的定課");
+  const cfg = readCfg(ss);
+  if (!cfg) throw appError("invalid", "請先設定實驗期間");
+  if (p.add) {
+    const by = {};
+    PEOPLE.filter(n => n !== who).forEach(n => { by[n] = { from: null, to: NEVER }; });
+    cfg.practices.push({ id: p.add.id, name: p.add.name, note: p.add.note, addedOn: p.add.addedOn, removedOn: null, by: by });
+  } else {
+    const item = cfg.practices.filter(x => x.id === p.id)[0];
+    if (!item) throw appError("invalid", "找不到這項定課");
+    item.by = item.by || {};
+    if (p.remove) {
+      if (PEOPLE.some(n => !(item.by[n] && item.by[n].to))) throw appError("invalid", "還有人在做這項定課");
+      item.removedOn = new Date().toISOString().slice(0, 10);
+    } else {
+      item.by[who] = p.entry;
+    }
+  }
+  upsert(tab(ss, "設定"), "實驗", ["實驗", JSON.stringify(cleanCfg(cfg))]);
+}
+
 function applyWrite(ss, p, me) {
   switch (p.action) {
     case "saveConfig":
       if (me !== ADMIN) throw appError("invalid", "只有邱子芸可以修改規則");
-      upsert(tab(ss, "設定"), "實驗", ["實驗", JSON.stringify(cleanCfg(p.cfg))]);
+      {
+        // 定課由 saveMenu 管，這裡保留試算表裡的版本，才不會蓋掉別人剛改的菜單
+        const cur = readCfg(ss);
+        upsert(tab(ss, "設定"), "實驗", ["實驗", JSON.stringify(cleanCfg({ ...p.cfg, practices: cur ? cur.practices : p.cfg.practices }))]);
+      }
+      return;
+    case "saveMenu":
+      saveMenu(ss, p, me);
       return;
     case "setPassword":
       if (me !== ADMIN) throw appError("invalid", "只有邱子芸可以設定密碼");
