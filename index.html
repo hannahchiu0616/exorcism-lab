@@ -139,6 +139,8 @@ form { display: grid; gap: 12px; margin: 0; min-width: 0; }
 .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); }
 .matrix { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
 .matrix th, .matrix td { min-width: 34px; padding: 6px 2px; text-align: center; border-bottom: 1px solid var(--line); font-weight: 500; white-space: nowrap; }
+.matrix td, .matrix thead th { border-right: 1px solid var(--line); }
+.matrix tr > :last-child { border-right: 0; }
 .matrix tbody tr:last-child th, .matrix tbody tr:last-child td { border-bottom: 0; }
 .matrix thead th { font-family: var(--mono); font-size: 12px; color: var(--muted); }
 .matrix small { display: block; font-family: var(--body); font-size: 11px; color: var(--muted); font-weight: 400; }
