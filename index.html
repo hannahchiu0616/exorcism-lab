@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=LXGW+WenKai+TC&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@900&display=swap">
 <style>
-/* Layout: a quiet title bar with one cinnabar seal over a single-column lab notebook. */
+/* Layout: a talisman-yellow title band over a single-column lab notebook. */
 :root {
   --bg: #EEF0EA; --surface: #F9FAF6; --ink: #1D2A2A; --muted: #566462; --line: #CBD2C9;
   --cinnabar: #B92B1B; --on-cinnabar: #FFF6EC;
@@ -42,14 +42,11 @@ button, input, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
 :focus-visible { outline: 2px solid var(--cinnabar); outline-offset: 2px; }
 
-.band { background: var(--surface); color: var(--ink); }
-.band .wrap { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding-block: 18px; }
-.brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.brand-seal { flex: none; width: 44px; height: 44px; display: grid; place-items: center; border-radius: 4px; background: var(--cinnabar); color: var(--on-cinnabar); font-family: var(--display); font-weight: 900; font-size: 26px; line-height: 1; }
-.band h1 { margin: 0; font-family: var(--display); font-weight: 700; font-size: clamp(22px, 5.5vw, 28px); line-height: 1.2; letter-spacing: .1em; color: var(--ink); }
-.role { margin: 6px 0 0; font-size: 14px; }
-.count { flex: none; text-align: right; font-size: 13px; color: var(--muted); }
-.count b { display: block; font-size: 18px; line-height: 1.3; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+.band { background: var(--talisman); color: var(--on-talisman); }
+.band .wrap { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding-block: 20px; }
+.band h1 { margin: 0; font-family: var(--display); font-weight: 900; font-size: clamp(34px, 9vw, 52px); line-height: 1.1; letter-spacing: .08em; color: var(--title); }
+.count { flex: none; text-align: right; font-size: 13px; }
+.count b { display: block; font-size: 18px; line-height: 1.3; font-weight: 700; font-variant-numeric: tabular-nums; }
 
 .tabs { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); }
 .login { display: grid; gap: 12px; margin: 14px 0 0; }
@@ -171,13 +168,7 @@ textarea.short { min-height: 76px; }
 
 <header class="band">
   <div class="wrap">
-    <div class="brand">
-      <span class="brand-seal" aria-hidden="true">驅</span>
-      <div>
-        <h1>驅魔實驗室</h1>
-        <p class="role">定課實驗紀錄</p>
-      </div>
-    </div>
+    <h1>驅魔實驗室</h1>
     <div class="count" id="count"></div>
   </div>
 </header>
