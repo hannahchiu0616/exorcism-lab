@@ -148,12 +148,8 @@ function snapshot(ss, me) {
     const who = r[2] || PEOPLE[0];
     (by[who] = by[who] || {})[r[0]] = { done: parse(r[1], {}) };
   });
-  // 觀察者名單只給邱子芸
   const cfg = parse(settings["實驗"], null);
-  if (cfg) {
-    if (me === ADMIN) cfg.observers = observers(ss);
-    else delete cfg.observers;
-  }
+  if (cfg) cfg.observers = observers(ss);
   return {
     cfg: cfg,
     checkins: by[PEOPLE[0]],

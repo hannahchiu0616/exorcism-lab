@@ -198,7 +198,7 @@ textarea.short { min-height: 76px; }
       <label class="field">姓名<select id="login-name" required></select></label>
       <label class="field">密碼<input type="password" id="login-pass" maxlength="60" autocomplete="current-password" required></label>
     </div>
-    <label class="field" id="login-observer-field" hidden>觀察者姓名<input type="text" id="login-observer" maxlength="20" autocomplete="username"></label>
+    <label class="field" id="login-observer-field" hidden>觀察者姓名<select id="login-observer"></select></label>
     <button class="primary" type="submit">登入</button>
   </form>
   <p class="who" id="who-bar" hidden><span id="who-name"></span><button class="link" id="logout" type="button">登出</button></p>
@@ -330,7 +330,7 @@ textarea.short { min-height: 76px; }
           <button class="primary" type="submit">設定密碼</button>
         </form>
       </div>
-      <div id="observer-group" class="group" hidden>
+      <div id="observer-group" class="group">
       <h2>觀察者</h2>
       <ul class="edit-list" id="observer-list"></ul>
       <form id="observer-form">
@@ -568,9 +568,13 @@ textarea.short { min-height: 76px; }
     $("observer-list").replaceChildren(...list.map((n) => h("li", null, h("span", null, n),
       list.length > 1 ? deleteButton("移除", () => setObservers(list.filter((x) => x !== n), "已移除觀察者")) : null)));
     const names = [...PEOPLE, ...list], select = $("account-name"), chosen = select.value;
+    const loginObserver = $("login-observer"), picked = loginObserver.value;
+    if (document.activeElement !== loginObserver) {
+      loginObserver.replaceChildren(h("option", { value: "" }, "請選擇觀察者"), ...list.map((n) => h("option", null, n)));
+      loginObserver.value = list.includes(picked) ? picked : "";
+    }
     $("account-group").hidden = S.me !== PEOPLE[0];
     $("my-pass-form").hidden = !S.me;
-    $("observer-group").hidden = S.me !== PEOPLE[0];
     $("account-list").replaceChildren(...names.map((n) => h("li", null, h("span", null, n), h("span", { class: "muted" }, S.hasPassword.includes(n) ? "已設定密碼" : "未設定"))));
     if (document.activeElement !== select) {
       select.replaceChildren(...names.map((n) => h("option", null, n)));
@@ -934,7 +938,7 @@ textarea.short { min-height: 76px; }
     writes++;
     try {
       const asObserver = $("login-name").value === "observer";
-      const name = asObserver ? $("login-observer").value.trim() : $("login-name").value;
+      const name = asObserver ? $("login-observer").value : $("login-name").value;
       const d = await call("login", { name, password: $("login-pass").value });
       setAuth(d.session);
       $("login-pass").value = "";
