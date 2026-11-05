@@ -99,8 +99,14 @@ function cleanCfg(c) {
   const days = Math.round(Number(c.days));
   if (!(days >= 1 && days <= 365)) throw appError("invalid", "實驗天數請填 1 到 365");
   if (!Array.isArray(c.practices) || c.practices.length > 100) throw appError("invalid", "訂課清單不正確");
+  const r = c.rules || {};
   return {
     startDate: c.startDate, days: days,
+    rules: {
+      weekdays: (Array.isArray(r.weekdays) ? r.weekdays : [1, 2, 3, 4, 5]).map(Number).filter(d => d >= 0 && d <= 6),
+      restDays: (Array.isArray(r.restDays) ? r.restDays : []).filter(isDate).slice(0, 366),
+      text: String(r.text == null ? "" : r.text).slice(0, 500),
+    },
     practices: c.practices.map(p => ({
       id: text(p.id, 40), name: text(p.name, 60), note: String(p.note || "").slice(0, 120),
       addedOn: isDate(p.addedOn) ? p.addedOn : null, removedOn: isDate(p.removedOn) ? p.removedOn : null,

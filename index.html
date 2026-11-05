@@ -51,7 +51,7 @@ button { cursor: pointer; }
 
 .tabs { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); }
 .tabs .wrap { display: flex; gap: 4px; }
-.tab { flex: 1 1 0; min-width: 0; background: none; border: 0; border-bottom: 3px solid transparent; padding: 12px 4px 9px; font-weight: 500; color: var(--muted); }
+.tab { flex: 1 1 auto; min-width: 0; background: none; border: 0; border-bottom: 3px solid transparent; padding: 12px 2px 9px; font-size: 14px; font-weight: 500; white-space: nowrap; color: var(--muted); }
 .tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--cinnabar); font-weight: 700; }
 .tab small { font-family: var(--mono); font-size: 12px; margin-left: 4px; }
 
@@ -63,10 +63,6 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 .banner { background: var(--talisman-soft); color: var(--on-talisman); padding: 10px 14px; border-radius: 4px; font-size: 14px; margin: 0; }
 .empty { border: 1px dashed var(--line); border-radius: 4px; padding: 24px 16px; color: var(--muted); text-align: center; margin: 0; }
 
-.datebar { display: flex; align-items: center; gap: 8px; }
-.datebar .label { flex: 1; min-width: 0; text-align: center; }
-.datebar .label b { display: block; font-size: 19px; }
-.datebar .label span { font-size: 14px; color: var(--muted); }
 .icon-btn { width: 44px; height: 44px; flex: none; background: var(--surface); border: 1px solid var(--line); border-radius: 4px; font-size: 20px; line-height: 1; }
 .icon-btn:disabled { opacity: .35; cursor: default; }
 .link { background: none; border: 0; padding: 0; color: var(--cinnabar); font-size: 14px; text-decoration: underline; text-underline-offset: 3px; }
@@ -92,22 +88,11 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 .day { aspect-ratio: 1; max-width: 100%; padding: 0; border: 1px solid var(--line); border-radius: 3px; background: var(--surface); font-family: var(--mono); font-size: 13px; color: var(--muted); }
 .day.part { background: var(--talisman-soft); color: var(--on-talisman); border-color: transparent; }
 .day.full { background: var(--cinnabar); color: var(--on-cinnabar); border-color: transparent; }
-.day.future { background: none; border-style: dashed; cursor: default; opacity: .6; }
-.day.sel { outline: 2px solid var(--ink); outline-offset: 1px; }
 .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: var(--muted); }
 .legend i { display: inline-block; width: 11px; height: 11px; margin-right: 5px; border-radius: 2px; vertical-align: -1px; border: 1px solid var(--line); background: var(--surface); }
 .legend .p { background: var(--talisman-soft); border-color: transparent; }
 .legend .f { background: var(--cinnabar); border-color: transparent; }
-.rows { display: grid; gap: 10px; }
-.row-top { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; }
-.row-top span:first-child { min-width: 0; overflow-wrap: anywhere; }
-.row-top span:last-child { flex: none; font-family: var(--mono); font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
-.bar { height: 6px; background: var(--line); border-radius: 1px; overflow: hidden; }
-.bar i { display: block; height: 100%; background: var(--cinnabar); }
 
-details { border-top: 1px solid var(--line); padding-top: 12px; }
-summary { cursor: pointer; font-weight: 700; }
-.settings { display: grid; gap: 16px; padding-top: 14px; }
 .field { display: grid; gap: 4px; min-width: 0; font-size: 14px; color: var(--muted); }
 input[type="text"], input[type="date"], input[type="number"], textarea { width: 100%; min-width: 0; padding: 9px 10px; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 4px; }
 textarea { min-height: 132px; resize: vertical; font-family: var(--hand); font-size: 17px; line-height: 1.8; }
@@ -135,6 +120,29 @@ form { display: grid; gap: 12px; margin: 0; min-width: 0; }
 .text { margin: 0; font-family: var(--hand); font-size: 17px; line-height: 1.85; white-space: pre-wrap; overflow-wrap: anywhere; }
 .entry .actions { margin-top: 2px; gap: 14px; }
 
+.datebar { display: flex; align-items: flex-end; gap: 8px; }
+.date-field { flex: 1; }
+.date-field input { height: 44px; text-align: center; }
+.dayline { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; font-size: 14px; color: var(--muted); }
+.remain { display: grid; gap: 2px; padding: 10px 14px; border-radius: 4px; background: var(--talisman-soft); color: var(--on-talisman); font-size: 14px; overflow-wrap: anywhere; }
+.remain b { font-size: 15px; }
+.remain.clear { background: var(--cinnabar); color: var(--on-cinnabar); }
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); }
+.matrix { border-collapse: separate; border-spacing: 0; font-size: 13px; }
+.matrix th, .matrix td { min-width: 44px; padding: 6px 4px; text-align: center; border-bottom: 1px solid var(--line); font-weight: 500; white-space: nowrap; }
+.matrix tbody tr:last-child th, .matrix tbody tr:last-child td { border-bottom: 0; }
+.matrix thead th { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.matrix small { display: block; font-family: var(--body); font-size: 11px; color: var(--muted); font-weight: 400; }
+.matrix .name { position: sticky; left: 0; z-index: 1; min-width: 104px; max-width: 150px; padding-inline: 10px; text-align: left; white-space: normal; background: var(--surface); border-right: 1px solid var(--line); color: var(--ink); font-family: var(--body); }
+.matrix .off { color: var(--muted); background: var(--bg); font-size: 12px; }
+.mark { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 2px; background: var(--cinnabar); color: var(--on-cinnabar); font-family: var(--display); font-weight: 900; font-size: 14px; transform: rotate(-7deg); }
+.miss { color: var(--muted); }
+.day.future { background: none; border-style: dashed; }
+.day.later { cursor: default; opacity: .6; }
+.day.rest { background: var(--line); color: var(--muted); border-color: transparent; }
+.legend .r { background: var(--line); border-color: transparent; }
+textarea.short { min-height: 76px; }
+@media (min-width: 560px) { .pracs { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(20px + env(safe-area-inset-bottom, 0px)); z-index: 20; max-width: calc(100vw - 32px); padding: 9px 16px; background: var(--ink); color: var(--bg); border-radius: 4px; font-size: 14px; }
 </style>
 </head>
@@ -153,9 +161,11 @@ form { display: grid; gap: 12px; margin: 0; min-width: 0; }
 
 <nav class="tabs" aria-label="頁籤">
   <div class="wrap" role="tablist">
-    <button class="tab" role="tab" id="tab-checkin" data-view="checkin" type="button">每日打卡</button>
+    <button class="tab" role="tab" id="tab-checkin" data-view="checkin" type="button">打卡</button>
+    <button class="tab" role="tab" id="tab-overview" data-view="overview" type="button">總覽</button>
     <button class="tab" role="tab" id="tab-journal" data-view="journal" type="button">心路歷程</button>
     <button class="tab" role="tab" id="tab-notes" data-view="notes" type="button">留言板</button>
+    <button class="tab" role="tab" id="tab-rules" data-view="rules" type="button">規則</button>
   </div>
 </nav>
 
@@ -163,35 +173,31 @@ form { display: grid; gap: 12px; margin: 0; min-width: 0; }
   <p class="banner" id="banner" hidden></p>
 
   <section class="panel" id="view-checkin" role="tabpanel" aria-labelledby="tab-checkin">
+    <p class="muted" id="rule-line" hidden></p>
+    <div class="group" id="check-controls" hidden>
+      <div class="datebar">
+        <button class="icon-btn" id="prev-day" type="button" aria-label="前一天">‹</button>
+        <label class="field date-field">打卡日期<input type="date" id="check-date"></label>
+        <button class="icon-btn" id="next-day" type="button" aria-label="後一天">›</button>
+      </div>
+      <div class="dayline"><span id="day-label"></span><button class="link" id="go-today" type="button" hidden>回到今天</button></div>
+    </div>
     <div class="group" id="today-group"></div>
+  </section>
+
+  <section class="panel" id="view-overview" role="tabpanel" aria-labelledby="tab-overview" hidden>
+    <p class="empty" id="overview-empty" hidden></p>
     <div class="group" id="progress-group" hidden>
       <h2>實驗進度</h2>
       <dl class="stats" id="stats"></dl>
       <div class="days" id="days"></div>
-      <div class="legend"><span><i class="f"></i>全部完成</span><span><i class="p"></i>部分完成</span><span><i></i>未打卡</span></div>
+      <div class="legend"><span><i class="f"></i>全部完成</span><span><i class="p"></i>部分完成</span><span><i></i>未打卡</span><span><i class="r"></i>休息</span></div>
     </div>
-    <div class="group" id="each-group" hidden>
-      <h2>各項訂課完成次數</h2>
-      <div class="rows" id="rows"></div>
+    <div class="group" id="matrix-group" hidden>
+      <h2>每項訂課的打卡紀錄</h2>
+      <p class="muted">最新的日期在最左邊，往右滑看更早的日子。</p>
+      <div class="table-wrap" id="matrix"></div>
     </div>
-    <details id="settings" hidden>
-      <summary>實驗設定</summary>
-      <div class="settings">
-        <div class="two">
-          <label class="field">開始日期<input type="date" id="set-start"></label>
-          <label class="field">實驗天數<input type="number" id="set-days" min="1" max="365" inputmode="numeric"></label>
-        </div>
-        <div class="group">
-          <h2>訂課清單</h2>
-          <ul class="edit-list" id="edit-list"></ul>
-          <form id="add-form">
-            <label class="field">訂課名稱<input type="text" id="add-name" maxlength="60" required></label>
-            <label class="field">說明（選填，例如時間或次數）<input type="text" id="add-note" maxlength="120"></label>
-            <button class="primary" type="submit">加入訂課</button>
-          </form>
-        </div>
-      </div>
-    </details>
   </section>
 
   <section class="panel" id="view-journal" role="tabpanel" aria-labelledby="tab-journal" hidden>
@@ -240,6 +246,42 @@ form { display: grid; gap: 12px; margin: 0; min-width: 0; }
       <p class="empty" id="note-empty" hidden></p>
     </div>
   </section>
+
+  <section class="panel" id="view-rules" role="tabpanel" aria-labelledby="tab-rules" hidden>
+    <div class="group">
+      <h2>實驗規則</h2>
+      <label class="field">規則內容<textarea id="rule-text" class="short" maxlength="500"></textarea></label>
+    </div>
+    <div class="group">
+      <h2>要做訂課的日子</h2>
+      <div class="energy who" id="weekday-picks" role="group" aria-label="要做訂課的星期"></div>
+    </div>
+    <div class="group">
+      <h2>休息日</h2>
+      <p class="muted">國定假日或其他要休息的日子加在這裡，這天不列入打卡和完成率。</p>
+      <ul class="edit-list" id="rest-list"></ul>
+      <form id="rest-form">
+        <label class="field">日期<input type="date" id="rest-date" required></label>
+        <button class="primary" type="submit">加入休息日</button>
+      </form>
+    </div>
+    <div class="group">
+      <h2>實驗期間</h2>
+      <div class="two">
+        <label class="field">開始日期<input type="date" id="set-start"></label>
+        <label class="field">實驗天數<input type="number" id="set-days" min="1" max="365" inputmode="numeric"></label>
+      </div>
+    </div>
+    <div class="group">
+      <h2>訂課清單</h2>
+      <ul class="edit-list" id="edit-list"></ul>
+      <form id="add-form">
+        <label class="field">訂課名稱<input type="text" id="add-name" maxlength="60" required></label>
+        <label class="field">說明（選填，例如時間或次數）<input type="text" id="add-note" maxlength="120"></label>
+        <button class="primary" type="submit">加入訂課</button>
+      </form>
+    </div>
+  </section>
 </main>
 <div class="toast" id="toast" role="status" hidden></div>
 
@@ -247,8 +289,9 @@ form { display: grid; gap: 12px; margin: 0; min-width: 0; }
 (() => {
   const $ = (id) => document.getElementById(id);
   const WEEK = ["日", "一", "二", "三", "四", "五", "六"];
-  const VIEWS = ["checkin", "journal", "notes"];
+  const VIEWS = ["checkin", "overview", "journal", "notes", "rules"];
   const DEFAULT_DAYS = 21;
+  const DEFAULT_RULES = { weekdays: [1, 2, 3, 4, 5], restDays: [], text: "只做平日，見紅就休息" };
 
   const API = "https://script.google.com/macros/s/AKfycbyHMXCObmXzh1VNL9aL0vl6xC8JHrlRmGY83uN88fDpYnO5roRPZfF3bfiQYEmc-ccr/exec"; /* Apps Script 網頁應用程式網址 */
   const ROLE_KEY = "exorcism-lab-role";
@@ -287,7 +330,14 @@ form { display: grid; gap: 12px; margin: 0; min-width: 0; }
   const lastElapsed = () => { const t = today(), e = lastDay(); return t < e ? t : e; };
   const started = () => !!S.cfg && today() >= S.cfg.startDate;
   const applies = (p, date) => (!p.addedOn || date >= p.addedOn) && (!p.removedOn || date < p.removedOn);
-  const activeOn = (date) => (S.cfg ? S.cfg.practices : []).filter((p) => applies(p, date));
+  const rules = () => ({ ...DEFAULT_RULES, ...((S.cfg && S.cfg.rules) || {}) });
+  const weekdayOf = (s) => new Date(utc(s)).getUTCDay();
+  const restReason = (date) => {
+    const r = rules();
+    if (r.restDays.includes(date)) return "休息日";
+    return r.weekdays.includes(weekdayOf(date)) ? "" : `週${WEEK[weekdayOf(date)]}休息`;
+  };
+  const activeOn = (date) => (restReason(date) ? [] : (S.cfg ? S.cfg.practices : []).filter((p) => applies(p, date)));
   const currentPractices = () => (S.cfg ? S.cfg.practices : []).filter((p) => !p.removedOn);
   const doneMap = (date) => (S.checkins[date] && S.checkins[date].done) || {};
   const dayScore = (date) => {
@@ -377,23 +427,24 @@ form { display: grid; gap: 12px; margin: 0; min-width: 0; }
     queue = run.catch(() => {});
     return run.then((d) => {
       inFlight--;
-      if (!inFlight) applyData(d.data);
+      if (!inFlight && !checkinTimer) applyData(d.data);
       return true;
     }, (e) => {
       inFlight--;
       if (e.code === "invalid") toast(e.message);
       else toast("儲存失敗，請檢查網路後再試一次。");
+      lastRaw = "";
       refresh();
       return false;
     });
   }
   async function refresh() {
-    if (!API || refreshing || document.hidden) return;
+    if (!API || refreshing || document.hidden || checkinTimer) return;
     refreshing = true;
     const startedAt = writes;
     try {
       const d = await call("getAll");
-      if (startedAt === writes && !inFlight) applyData(d.data);
+      if (startedAt === writes && !inFlight && !checkinTimer) applyData(d.data);
       setBanner("");
     } catch (e) {
       setBanner("暫時連不上紀錄，稍後會自動重試。");
@@ -443,74 +494,109 @@ form { display: grid; gap: 12px; margin: 0; min-width: 0; }
   function renderToday() {
     const g = $("today-group");
     const focusId = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.pid : null;
+    const ruleLine = $("rule-line");
+    ruleLine.hidden = !S.loaded || !rules().text;
+    ruleLine.textContent = "規則：" + rules().text;
+    const ready = S.loaded && currentPractices().length > 0 && started();
+    $("check-controls").hidden = !ready;
     g.replaceChildren();
     if (!S.loaded) { g.append(h("p", { class: "empty" }, "正在讀取打卡紀錄……")); return; }
-    if (!currentPractices().length && !elapsedDates().some((d) => activeOn(d).length)) {
-      g.append(h("p", { class: "empty" }, "還沒有訂課。在下方「實驗設定」設好開始日期，加入第一項訂課。"));
+    if (!currentPractices().length) {
+      g.append(h("p", { class: "empty" }, "還沒有訂課。到「規則」分頁加入第一項訂課。"));
       return;
     }
     if (!started()) {
       g.append(h("p", { class: "empty" }, `實驗從 ${prettyDate(S.cfg.startDate)} 開始，當天起就能打卡。`));
       return;
     }
-    const sel = S.selDate, end = lastElapsed();
+    const sel = S.selDate, end = lastElapsed(), isToday = sel === today();
+    const input = $("check-date");
+    input.min = S.cfg.startDate; input.max = end;
+    if (document.activeElement !== input) input.value = sel;
+    $("prev-day").disabled = sel <= S.cfg.startDate;
+    $("next-day").disabled = sel >= end;
+    $("go-today").hidden = isToday || today() > end;
     const score = dayScore(sel), done = doneMap(sel);
-    const prev = h("button", { class: "icon-btn", type: "button", "aria-label": "前一天", disabled: sel <= S.cfg.startDate, on: { click: () => { S.selDate = addDays(sel, -1); render(); } } }, "‹");
-    const next = h("button", { class: "icon-btn", type: "button", "aria-label": "後一天", disabled: sel >= end, on: { click: () => { S.selDate = addDays(sel, 1); render(); } } }, "›");
-    const label = h("div", { class: "label" }, h("b", null, prettyDate(sel)), h("span", null, `${dayLabel(sel)}　完成 ${score.done} / ${score.total}`));
-    g.append(h("div", { class: "datebar" }, prev, label, next));
-    if (sel !== end) g.append(h("div", null, h("button", { class: "link", type: "button", on: { click: () => { S.selDate = end; render(); } } }, "回到最新一天")));
-    g.append(h("div", { class: "pracs" }, activeOn(sel).map((p) => {
+    const reason = restReason(sel);
+    $("day-label").textContent = `${prettyDate(sel)}　${dayLabel(sel)}` + (reason ? "" : `　完成 ${score.done} / ${score.total}`);
+    if (reason) {
+      g.append(h("p", { class: "empty" }, `${reason}，這天不用打卡。`));
+      if (rules().restDays.includes(sel)) g.append(h("div", null, h("button", { class: "link", type: "button", on: { click: () => setRest(sel, false) } }, "取消這天的休息日")));
+      else g.append(h("p", { class: "muted" }, "要改成這天也做訂課，到「規則」分頁調整。"));
+      return;
+    }
+    const list = activeOn(sel), left = list.filter((p) => !done[p.id]);
+    const word = isToday ? "今天" : "這天";
+    g.append(left.length
+      ? h("div", { class: "remain" }, h("b", null, `${word}尚未完成 ${left.length} 項`), h("span", null, left.map((p) => p.name).join("、")))
+      : h("div", { class: "remain clear" }, h("b", null, `${word}的訂課全部完成`)));
+    g.append(h("div", { class: "pracs" }, list.map((p) => {
       const isDone = !!done[p.id];
-      const b = h("button", {
+      return h("button", {
         class: "prac" + (S.justStamped === p.id && isDone ? " stamp" : ""),
         type: "button", role: "checkbox", "aria-checked": String(isDone), "data-pid": p.id,
         on: { click: () => toggle(p.id) },
       },
         h("span", { class: "seal", "aria-hidden": "true" }, "成"),
         h("span", { class: "prac-text" }, h("b", null, p.name), p.note ? h("small", null, p.note) : null));
-      return b;
     })));
+    g.append(h("div", { class: "actions" },
+      h("button", { class: "ghost", type: "button", on: { click: () => setAll(left.length > 0) } }, left.length ? "全部勾選" : "全部取消"),
+      h("button", { class: "link", type: "button", on: { click: () => setRest(sel, true) } }, "把這天設為休息日")));
     if (focusId) { const el = g.querySelector(`[data-pid="${focusId}"]`); if (el) el.focus(); }
     S.justStamped = null;
   }
-  function renderProgress() {
-    const show = S.loaded && !!S.cfg && S.cfg.practices.length > 0;
-    $("progress-group").hidden = !show;
-    $("each-group").hidden = !show || !started();
-    if (!show) return;
+  function renderOverview() {
+    const hasPractices = S.loaded && !!S.cfg && S.cfg.practices.length > 0;
+    const empty = $("overview-empty");
+    empty.hidden = !S.loaded || hasPractices;
+    empty.textContent = "還沒有訂課，加入訂課後這裡會顯示打卡狀況。";
+    $("progress-group").hidden = !hasPractices;
+    $("matrix-group").hidden = !hasPractices || !started();
+    if (!hasPractices) return;
     const st = computeStats();
     $("stats").replaceChildren(...[["全部完成", `${st.fullDays} 天`], ["目前連續", `${st.streak} 天`], ["總完成率", `${st.rate}%`]]
       .map(([k, v]) => h("div", null, h("dt", null, k), h("dd", null, v))));
     const t = lastElapsed(), cells = [];
     for (let i = 0; i < S.cfg.days; i++) {
       const d = addDays(S.cfg.startDate, i), future = !started() || d > t;
-      const s = dayScore(d);
-      const cls = future ? "future" : s.total && s.done === s.total ? "full" : s.done ? "part" : "";
+      const s = dayScore(d), rest = !!restReason(d);
+      const cls = rest ? "rest" : future ? "future" : s.total && s.done === s.total ? "full" : s.done ? "part" : "";
       cells.push(h("button", {
-        class: `day ${cls}${d === S.selDate ? " sel" : ""}`, type: "button", disabled: future,
-        "aria-label": `第 ${i + 1} 天，${prettyDate(d)}，完成 ${s.done} / ${s.total}`,
-        title: prettyDate(d), on: { click: () => { S.selDate = d; render(); window.scrollTo({ top: 0 }); } },
+        class: `day ${cls}${future ? " later" : ""}`, type: "button", disabled: future,
+        "aria-label": `第 ${i + 1} 天，${prettyDate(d)}，` + (rest ? "休息" : `完成 ${s.done} / ${s.total}`),
+        title: prettyDate(d), on: { click: () => { S.selDate = d; location.hash = "checkin"; } },
       }, String(i + 1)));
     }
     $("days").replaceChildren(...cells);
-    const dates = elapsedDates();
-    $("rows").replaceChildren(...S.cfg.practices.filter((p) => dates.some((d) => applies(p, d))).map((p) => {
-      const ds = dates.filter((d) => applies(p, d));
-      const n = ds.filter((d) => doneMap(d)[p.id]).length;
-      const pct = ds.length ? (n / ds.length) * 100 : 0;
-      const bar = h("i"); bar.style.width = pct + "%";
-      return h("div", null,
-        h("div", { class: "row-top" }, h("span", null, p.name + (p.removedOn ? "（已移除）" : "")), h("span", null, `${n} / ${ds.length} 天`)),
-        h("div", { class: "bar" }, bar));
+    const dates = elapsedDates().reverse();
+    const head = h("tr", null, h("th", { class: "name", scope: "col" }, "訂課"), dates.map((d) => {
+      const [, m, day] = parts(d);
+      return h("th", { scope: "col" }, `${m}/${day}`, h("small", null, `週${WEEK[weekdayOf(d)]}`));
     }));
+    const body = S.cfg.practices.filter((p) => !p.removedOn || dates.some((d) => applies(p, d))).map((p) => {
+      const due = dates.filter((d) => applies(p, d) && !restReason(d));
+      const n = due.filter((d) => doneMap(d)[p.id]).length;
+      return h("tr", null,
+        h("th", { class: "name", scope: "row" }, p.name + (p.removedOn ? "（已移除）" : ""), h("small", null, `${n} / ${due.length} 天`)),
+        dates.map((d) => {
+          if (restReason(d)) return h("td", { class: "off" }, "休");
+          if (!applies(p, d)) return h("td", null, "");
+          return h("td", null, doneMap(d)[p.id] ? h("span", { class: "mark" }, "成") : h("span", { class: "miss", "aria-label": "未完成" }, "·"));
+        }));
+    });
+    $("matrix").replaceChildren(h("table", { class: "matrix" }, h("thead", null, head), h("tbody", null, body)));
   }
-  let settingsOpened = false;
-  function renderSettings() {
-    const box = $("settings");
-    box.hidden = !S.loaded;
-    if (box.hidden) return;
-    if (!settingsOpened && !currentPractices().length) { box.open = true; settingsOpened = true; }
+  function renderRules() {
+    const r = rules(), text = $("rule-text");
+    if (document.activeElement !== text) text.value = r.text;
+    const picks = [1, 2, 3, 4, 5, 6, 0].map((d) => h("button", {
+      type: "button", "aria-pressed": String(r.weekdays.includes(d)), on: { click: () => toggleWeekday(d) },
+    }, `週${WEEK[d]}`));
+    $("weekday-picks").replaceChildren(...picks);
+    $("rest-list").replaceChildren(...(r.restDays.length ? [...r.restDays].sort().map((d) => h("li", null,
+      h("span", null, prettyDate(d)),
+      deleteButton("移除", () => setRest(d, false)))) : [h("li", { class: "muted" }, "目前沒有休息日。")]));
     const start = $("set-start"), days = $("set-days");
     if (document.activeElement !== start) start.value = S.cfg ? S.cfg.startDate : (start.value || today());
     if (document.activeElement !== days) days.value = S.cfg ? S.cfg.days : (days.value || DEFAULT_DAYS);
@@ -555,17 +641,50 @@ form { display: grid; gap: 12px; margin: 0; min-width: 0; }
   }
   function render() {
     clampSel();
-    renderHeader(); renderTabs(); renderToday(); renderProgress(); renderSettings(); renderJournal(); renderNotes();
+    renderHeader(); renderTabs(); renderToday(); renderOverview(); renderRules(); renderJournal(); renderNotes();
   }
 
   /* ---- actions ---- */
+  /* check-ins are saved together after a short pause, so ticking many at once is one write */
+  let dirtyDate = null, checkinTimer = null;
+  function flushCheckin() {
+    if (!checkinTimer) return;
+    clearTimeout(checkinTimer);
+    checkinTimer = null;
+    write("setCheckin", { date: dirtyDate, done: clone(doneMap(dirtyDate)) });
+  }
+  function storeDone(date, next) {
+    if (dirtyDate && dirtyDate !== date) flushCheckin();
+    S.checkins = { ...S.checkins, [date]: { done: next } };
+    render();
+    dirtyDate = date; writes++;
+    clearTimeout(checkinTimer);
+    checkinTimer = setTimeout(flushCheckin, 700);
+  }
   function toggle(pid) {
     const date = S.selDate, next = clone(doneMap(date));
     if (next[pid]) delete next[pid]; else { next[pid] = true; S.justStamped = pid; }
-    const body = { done: next };
-    S.checkins = { ...S.checkins, [date]: body };
-    render();
-    write("setCheckin", { date, done: next });
+    storeDone(date, next);
+  }
+  function setAll(on) {
+    const date = S.selDate, next = clone(doneMap(date));
+    for (const p of activeOn(date)) { if (on) next[p.id] = true; else delete next[p.id]; }
+    storeDone(date, next);
+  }
+  function saveRules(patch, msg) {
+    const next = baseCfg();
+    next.rules = { ...rules(), ...patch };
+    saveCfg(next).then((ok) => {
+      if (ok) toast(S.cfg && S.cfg.rules ? msg : "規則沒有存到，請先更新 Google 後端。");
+    });
+  }
+  function toggleWeekday(d) {
+    const cur = rules().weekdays;
+    saveRules({ weekdays: cur.includes(d) ? cur.filter((x) => x !== d) : [...cur, d] }, "已更新要做訂課的日子");
+  }
+  function setRest(date, on) {
+    const cur = rules().restDays.filter((d) => d !== date);
+    saveRules({ restDays: on ? [...cur, date] : cur }, on ? "已設為休息日" : "已取消休息日");
   }
   function removePractice(pid) {
     const next = baseCfg(), t = today();
@@ -601,7 +720,24 @@ form { display: grid; gap: 12px; margin: 0; min-width: 0; }
     renderTabs();
   }
   window.addEventListener("hashchange", routeFromHash);
-  document.addEventListener("visibilitychange", () => { if (!document.hidden) { render(); refresh(); } });
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) flushCheckin();
+    else { render(); refresh(); }
+  });
+  $("prev-day").addEventListener("click", () => { S.selDate = addDays(S.selDate, -1); render(); });
+  $("next-day").addEventListener("click", () => { S.selDate = addDays(S.selDate, 1); render(); });
+  $("go-today").addEventListener("click", () => { S.selDate = today(); render(); });
+  $("check-date").addEventListener("change", (e) => {
+    const d = e.target.value;
+    if (!d || d < S.cfg.startDate || d > lastElapsed()) { toast("這個日期不在可打卡的範圍內。"); e.target.value = S.selDate; return; }
+    S.selDate = d; render();
+  });
+  $("rule-text").addEventListener("change", (e) => saveRules({ text: e.target.value.trim() }, "已更新規則"));
+  $("rest-form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const d = $("rest-date").value;
+    if (d) { setRest(d, true); $("rest-date").value = ""; }
+  });
 
   $("add-form").addEventListener("submit", (e) => {
     e.preventDefault();
