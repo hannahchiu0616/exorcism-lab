@@ -120,10 +120,9 @@ textarea { min-height: 132px; resize: vertical; font-family: var(--hand); font-s
 .ghost { padding: 10px 14px; background: none; border: 1px solid var(--line); border-radius: 4px; }
 .actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 form { display: grid; gap: 12px; margin: 0; min-width: 0; }
-.energy { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 14px; color: var(--muted); }
-.energy button { width: 40px; height: 40px; background: var(--surface); border: 1px solid var(--line); border-radius: 4px; font-family: var(--mono); }
-.energy.who button { width: auto; padding-inline: 14px; font-family: var(--body); }
-.energy button[aria-pressed="true"] { background: var(--talisman); color: var(--on-talisman); border-color: transparent; }
+.picks { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 14px; color: var(--muted); }
+.picks button { height: 40px; padding-inline: 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 4px; font-family: var(--body); }
+.picks button[aria-pressed="true"] { background: var(--talisman); color: var(--on-talisman); border-color: transparent; }
 
 .entries { display: grid; gap: 22px; margin: 0; padding: 0; list-style: none; }
 .entry { display: grid; gap: 4px; min-width: 0; padding-bottom: 20px; border-bottom: 1px solid var(--line); }
@@ -232,14 +231,6 @@ textarea.short { min-height: 76px; }
     <form id="journal-form">
       <h2 id="journal-heading">寫下今天的觀察</h2>
       <label class="field">日期<input type="date" id="journal-date" required></label>
-      <div class="energy" id="energy" role="group" aria-label="今天的能量，1 最低，5 最高，可不填">
-        <span>今天的能量（選填）</span>
-        <button type="button" data-v="1" aria-pressed="false">1</button>
-        <button type="button" data-v="2" aria-pressed="false">2</button>
-        <button type="button" data-v="3" aria-pressed="false">3</button>
-        <button type="button" data-v="4" aria-pressed="false">4</button>
-        <button type="button" data-v="5" aria-pressed="false">5</button>
-      </div>
       <label class="field">觀察與心態
         <textarea id="journal-body" maxlength="5000" required placeholder="今天身體、情緒、念頭有什麼變化？"></textarea>
       </label>
@@ -278,7 +269,7 @@ textarea.short { min-height: 76px; }
     </div>
     <div class="group">
       <h2>要做訂課的日子</h2>
-      <div class="energy who" id="weekday-picks" role="group" aria-label="要做訂課的星期"></div>
+      <div class="picks" id="weekday-picks" role="group" aria-label="要做訂課的星期"></div>
     </div>
     <div class="group">
       <h2>休息日</h2>
@@ -344,7 +335,7 @@ textarea.short { min-height: 76px; }
   const S = {
     loaded: false, drafts: {}, saving: false, month: null, week: null,
     cfg: null, checkins: {}, checkinsBy: {}, multi: false, person: PEOPLE[0], journal: [], notes: [],
-    view: "checkin", selDate: null, justStamped: null, editing: null, energy: null,
+    view: "checkin", selDate: null, justStamped: null, editing: null,
   };
 
   try { const p = localStorage.getItem("person"); if (PEOPLE.includes(p)) S.person = p; } catch (e) { /* the default person is fine */ }
@@ -694,8 +685,7 @@ textarea.short { min-height: 76px; }
     if (!dateInput.value) dateInput.value = today();
     const list = S.journal.filter((e) => (e.person || PEOPLE[0]) === S.person).sort((a, b) => (b.date || "").localeCompare(a.date || "") || (b.createdAt || 0) - (a.createdAt || 0));
     $("journal-list").replaceChildren(...list.map((e) => {
-      const meta = h("div", { class: "meta" }, h("b", null, prettyDate(e.date)), dayLabel(e.date) ? h("span", null, dayLabel(e.date)) : null,
-        e.energy ? h("span", { class: "pill" }, `能量 ${e.energy} / 5`) : null);
+      const meta = h("div", { class: "meta" }, h("b", null, prettyDate(e.date)), dayLabel(e.date) ? h("span", null, dayLabel(e.date)) : null);
       const acts = h("div", { class: "actions" },
         h("button", { class: "link", type: "button", on: { click: () => startEdit(e) } }, "編輯"),
         deleteButton("刪除", () => write("deleteJournal", { id: e.id }).then((ok) => ok && toast("已刪除這筆紀錄"))));
@@ -808,19 +798,15 @@ textarea.short { min-height: 76px; }
     next.practices = next.practices.map((p) => (p.id === pid ? { ...p, removedOn: t } : p));
     saveCfg(next).then((ok) => ok && toast("已移除，過去的打卡紀錄會保留"));
   }
-  function setEnergy(v) {
-    S.energy = v;
-    for (const b of $("energy").querySelectorAll("button")) b.setAttribute("aria-pressed", String(Number(b.dataset.v) === v));
-  }
   function resetJournal() {
-    S.editing = null; setEnergy(null);
+    S.editing = null;
     $("journal-body").value = ""; $("journal-date").value = today();
     $("journal-heading").textContent = "寫下今天的觀察";
     $("journal-submit").textContent = "儲存紀錄";
     $("journal-cancel").hidden = true;
   }
   function startEdit(e) {
-    S.editing = e.id; setEnergy(e.energy || null);
+    S.editing = e.id;
     $("journal-body").value = e.body; $("journal-date").value = e.date;
     $("journal-heading").textContent = `編輯 ${prettyDate(e.date)} 的紀錄`;
     $("journal-submit").textContent = "更新紀錄";
@@ -902,10 +888,6 @@ textarea.short { min-height: 76px; }
   }
   $("set-start").addEventListener("change", savePeriod);
   $("set-end").addEventListener("change", savePeriod);
-  $("energy").addEventListener("click", (e) => {
-    const b = e.target.closest("button"); if (!b) return;
-    const v = Number(b.dataset.v); setEnergy(S.energy === v ? null : v);
-  });
   $("journal-cancel").addEventListener("click", resetJournal);
   $("journal-form").addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -913,7 +895,7 @@ textarea.short { min-height: 76px; }
     if (!body || !date || needsBackendUpdate()) return;
     const submit = $("journal-submit");
     submit.disabled = true;
-    const ok = await write("saveJournal", { id: S.editing, person: S.person, date, energy: S.energy, body: sheetSafe(body) });
+    const ok = await write("saveJournal", { id: S.editing, person: S.person, date, body: sheetSafe(body) });
     submit.disabled = false;
     if (ok) { resetJournal(); toast("已儲存紀錄"); }
   });
