@@ -5,8 +5,10 @@
 //   2. 上方函式選 setup → 執行 → 授權
 //   3. 部署 → 新增部署作業 → 網頁應用程式 → 執行身分「我」、存取權「所有人」→ 部署 → 複製網址
 
-const PEOPLE = ["邱子芸", "江宇熙", "邱家瑋"];
-const ADMIN = PEOPLE[0];
+const ADMIN = "邱子芸";
+// 實驗者名單存在設定裡，邱子芸可以從網頁的「規則」分頁新增；這是還沒存過名單時的預設值
+const DEFAULT_PEOPLE = [{ name: "邱子芸", joined: null }, { name: "江宇熙", joined: null }, { name: "邱家瑋", joined: "2026-11-09" }];
+let PEOPLE = DEFAULT_PEOPLE.map(p => p.name); // 每次請求開始時由 book() 從設定讀入
 const DEFAULT_OBSERVERS = ["邱美琪", "張克強"];
 const NEVER = "2000-01-01"; // 定課的 by[人].to 設成這天，代表這個人從沒做過
 
@@ -92,7 +94,9 @@ function setup() {
 function book() {
   const id = props().getProperty("sheetId");
   if (!id) throw appError("not_setup", "後端還沒安裝，請先執行 setup");
-  return SpreadsheetApp.openById(id);
+  const ss = SpreadsheetApp.openById(id);
+  PEOPLE = cleanPeople((readCfg(ss) || {}).people).map(p => p.name);
+  return ss;
 }
 function tab(ss, name) {
   let sh = ss.getSheetByName(name);
@@ -132,7 +136,7 @@ function findCheckin(sh, date, who) {
   if (n < 2) return 0;
   const col = sh.getRange(2, 1, n - 1, 3).getValues();
   for (let i = 0; i < col.length; i++) {
-    if (String(col[i][0]) === date && (String(col[i][2]) || PEOPLE[0]) === who) return i + 2;
+    if (String(col[i][0]) === date && (String(col[i][2]) || ADMIN) === who) return i + 2;
   }
   return 0;
 }
@@ -146,20 +150,20 @@ function snapshot(ss, me) {
   const by = {};
   PEOPLE.forEach(name => { by[name] = {}; });
   rows(ss, "打卡").forEach(r => {
-    const who = r[2] || PEOPLE[0];
+    const who = r[2] || ADMIN;
     (by[who] = by[who] || {})[r[0]] = { done: parse(r[1], {}) };
   });
   const cfg = parse(settings["實驗"], null);
   if (cfg) cfg.observers = observers(ss);
   return {
     cfg: cfg,
-    checkins: by[PEOPLE[0]],
+    checkins: by[ADMIN],
     checkinsBy: by,
     journal: rows(ss, "歷程").map(r => ({
       id: r[0], date: r[1], energy: r[2] ? Number(r[2]) : null, body: r[3],
-      createdAt: Number(r[4]) || 0, editedAt: Number(r[5]) || 0, person: r[6] || PEOPLE[0],
+      createdAt: Number(r[4]) || 0, editedAt: Number(r[5]) || 0, person: r[6] || ADMIN,
     })).filter(e => e.person === me),
-    notes: rows(ss, "留言").map(r => ({ id: r[0], body: r[1], createdAt: Number(r[2]) || 0, role: r[3], person: r[4] || PEOPLE[0] }))
+    notes: rows(ss, "留言").map(r => ({ id: r[0], body: r[1], createdAt: Number(r[2]) || 0, role: r[3], person: r[4] || ADMIN }))
       .filter(n => canSeeNote(n, me)),
     me: me || null,
     hasPassword: me === ADMIN ? users(ss).filter(n => props().getProperty("pw:" + n)) : [],
@@ -170,7 +174,7 @@ function parse(s, fallback) { try { return JSON.parse(s); } catch (e) { return f
 /* ---------- 檢查 ---------- */
 function appError(code, message) { const e = new Error(message); e.appCode = code; return e; }
 const isDate = s => /^\d{4}-\d{2}-\d{2}$/.test(String(s || ""));
-const person = s => (PEOPLE.indexOf(s) >= 0 ? s : PEOPLE[0]);
+const person = s => (PEOPLE.indexOf(s) >= 0 ? s : ADMIN);
 // 打卡期限：隔天中午 12 點（台灣時間，等於隔天的 UTC 04:00）
 function pastDeadline(date) {
   const [y, m, d] = date.split("-").map(Number);
@@ -187,8 +191,19 @@ function cleanRest(r) {
     restReasons: Object.keys(r.restReasons || {}).filter(isDate).slice(0, 366).reduce((o, d) => { o[d] = String(r.restReasons[d]).slice(0, 20); return o; }, {}),
   };
 }
-function cleanBy(b) {
-  return Object.keys(b || {}).filter(n => PEOPLE.indexOf(n) >= 0 && b[n]).reduce((o, n) => {
+// 邱子芸固定排第一位；名字不能重複
+function cleanPeople(list) {
+  const src = Array.isArray(list) && list.length ? list : DEFAULT_PEOPLE;
+  const seen = {}, out = [{ name: ADMIN, joined: null }];
+  seen[ADMIN] = true;
+  src.forEach(p => {
+    const n = String((p && p.name) || "").trim().slice(0, 20);
+    if (n && !seen[n]) { seen[n] = true; out.push({ name: n, joined: isDate(p.joined) ? p.joined : null }); }
+  });
+  return out.slice(0, 20);
+}
+function cleanBy(b, names) {
+  return Object.keys(b || {}).filter(n => names.indexOf(n) >= 0 && b[n]).reduce((o, n) => {
     o[n] = { from: isDate(b[n].from) ? b[n].from : null, to: isDate(b[n].to) ? b[n].to : null };
     return o;
   }, {});
@@ -198,20 +213,20 @@ function cleanCfg(c) {
   const days = Math.round(Number(c.days));
   if (!(days >= 1 && days <= 365)) throw appError("invalid", "實驗天數請填 1 到 365");
   if (!Array.isArray(c.practices) || c.practices.length > 100) throw appError("invalid", "定課清單不正確");
-  const r = c.rules || {};
+  const r = c.rules || {}, people = cleanPeople(c.people), names = people.map(p => p.name);
   return {
-    startDate: c.startDate, days: days,
-    observers: (Array.isArray(c.observers) ? c.observers : []).map(n => String(n).trim().slice(0, 20)).filter(Boolean).slice(0, 20),
+    startDate: c.startDate, days: days, people: people,
+    observers: (Array.isArray(c.observers) ? c.observers : []).map(n => String(n).trim().slice(0, 20)).filter(n => n && names.indexOf(n) < 0).slice(0, 20),
     rules: {
       weekdays: (Array.isArray(r.weekdays) ? r.weekdays : [1, 2, 3, 4, 5]).map(Number).filter(d => d >= 0 && d <= 6),
       ...cleanRest(r),
-      restBy: Object.keys(r.restBy || {}).filter(n => PEOPLE.indexOf(n) >= 0).reduce((o, n) => { o[n] = cleanRest(r.restBy[n]); return o; }, {}),
+      restBy: Object.keys(r.restBy || {}).filter(n => names.indexOf(n) >= 0).reduce((o, n) => { o[n] = cleanRest(r.restBy[n]); return o; }, {}),
       text: String(r.text == null ? "" : r.text).slice(0, 500),
     },
     practices: c.practices.map(p => ({
       id: text(p.id, 40), name: text(p.name, 60), note: String(p.note || "").slice(0, 120),
       addedOn: isDate(p.addedOn) ? p.addedOn : null, removedOn: isDate(p.removedOn) ? p.removedOn : null,
-      by: cleanBy(p.by),
+      by: cleanBy(p.by, names),
     })),
   };
 }
@@ -259,7 +274,7 @@ function doPost(e) {
 function ownJournalRow(sh, id, me) {
   if (PEOPLE.indexOf(me) < 0) throw appError("invalid", "請用實驗者本人的帳號登入");
   const row = findRow(sh, String(id));
-  if (row && (String(sh.getRange(row, 7).getValue()) || PEOPLE[0]) !== me) throw appError("invalid", "只能修改自己的紀錄");
+  if (row && (String(sh.getRange(row, 7).getValue()) || ADMIN) !== me) throw appError("invalid", "只能修改自己的紀錄");
   return row;
 }
 
@@ -298,8 +313,15 @@ function applyWrite(ss, p, me) {
       if (me !== ADMIN) throw appError("invalid", "只有邱子芸可以修改規則");
       {
         // 定課由 saveMenu 管，這裡保留試算表裡的版本，才不會蓋掉別人剛改的菜單
-        const cur = readCfg(ss);
-        upsert(tab(ss, "設定"), "實驗", ["實驗", JSON.stringify(cleanCfg({ ...p.cfg, practices: cur ? cur.practices : p.cfg.practices }))]);
+        const cur = readCfg(ss), next = cleanCfg({ ...p.cfg, practices: cur ? cur.practices : p.cfg.practices });
+        const names = next.people.map(x => x.name), used = {};
+        rows(ss, "打卡").forEach(r => { used[r[2] || ADMIN] = true; });
+        const gone = PEOPLE.filter(n => names.indexOf(n) < 0 && used[n]);
+        if (gone.length) throw appError("invalid", gone.join("、") + " 已經有打卡紀錄，不能移除");
+        // 新加入的實驗者從空白菜單開始，自己選要做的定課
+        names.filter(n => PEOPLE.indexOf(n) < 0).forEach(n => next.practices.forEach(x => { x.by[n] = { from: null, to: NEVER }; }));
+        upsert(tab(ss, "設定"), "實驗", ["實驗", JSON.stringify(next)]);
+        PEOPLE = names;
       }
       return;
     case "saveMenu":
@@ -350,7 +372,7 @@ function applyWrite(ss, p, me) {
       const sh = tab(ss, "留言"), row = findRow(sh, String(p.id));
       if (!row) return;
       const r = sh.getRange(row, 1, 1, 5).getValues()[0];
-      if (!canSeeNote({ role: String(r[3]), person: String(r[4]) || PEOPLE[0] }, me)) throw appError("invalid", "只能刪除自己的留言");
+      if (!canSeeNote({ role: String(r[3]), person: String(r[4]) || ADMIN }, me)) throw appError("invalid", "只能刪除自己的留言");
       sh.deleteRow(row);
       return;
     }

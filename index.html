@@ -335,6 +335,15 @@ textarea.short { min-height: 76px; }
           <button class="primary" type="submit">設定密碼</button>
         </form>
       </div>
+      <div id="people-group" class="group">
+      <h2>實驗者</h2>
+      <p class="muted">新加入的實驗者從加入當天開始算，之前的日子不列入打卡和完成率。已經有打卡紀錄的實驗者不能移除。</p>
+      <ul class="edit-list" id="people-list"></ul>
+      <form id="people-form">
+        <label class="field">實驗者姓名<input type="text" id="people-name" maxlength="20" required></label>
+        <button class="primary" type="submit">加入實驗者</button>
+      </form>
+      </div>
       <div id="observer-group" class="group">
       <h2>觀察者</h2>
       <ul class="edit-list" id="observer-list"></ul>
@@ -364,8 +373,14 @@ textarea.short { min-height: 76px; }
   const $ = (id) => document.getElementById(id);
   const WEEK = ["日", "一", "二", "三", "四", "五", "六"];
   const VIEWS = ["checkin", "overview", "journal", "notes", "rules"];
-  const PEOPLE = ["邱子芸", "江宇熙", "邱家瑋"];
-  const JOINED = { "邱家瑋": "2026-11-09" }; /* people who joined after day one; earlier days do not count for them */
+  /* the experimenter list lives in the config; the first person is the admin and people who joined later count from their join day */
+  const DEFAULT_PEOPLE = [{ name: "邱子芸", joined: null }, { name: "江宇熙", joined: null }, { name: "邱家瑋", joined: "2026-11-09" }];
+  let PEOPLE, JOINED;
+  const setPeople = (list) => {
+    PEOPLE = list.map((p) => p.name);
+    JOINED = Object.fromEntries(list.filter((p) => p.joined).map((p) => [p.name, p.joined]));
+  };
+  setPeople(DEFAULT_PEOPLE);
   const DEFAULT_OBSERVERS = ["邱美琪", "張克強"];
   const LOCK_MSG = "這天已鎖定，只能從後台修改。";
   const LEFT_PRACTICES = /接破曉|拳|嗯啊|光的冥想|大悲咒/;
@@ -382,7 +397,7 @@ textarea.short { min-height: 76px; }
     view: "checkin", selDate: null, justStamped: null, editing: null,
   };
 
-  try { const p = localStorage.getItem("person"); if (PEOPLE.includes(p)) S.person = p; } catch (e) { /* the default person is fine */ }
+  try { const p = localStorage.getItem("person"); S.wanted = p; if (PEOPLE.includes(p)) S.person = p; } catch (e) { /* the default person is fine */ }
   try { S.auth = JSON.parse(localStorage.getItem("auth")); S.me = (S.auth && S.auth.name) || ""; } catch (e) { S.auth = null; }
 
   /* ---- dates: plain YYYY-MM-DD strings in the viewer's local calendar ---- */
@@ -514,7 +529,7 @@ textarea.short { min-height: 76px; }
     if (S.multi && S.auth && data.me !== S.auth.name) { setAuth(null); toast("登入已失效，請重新登入。"); }
     S.hasPassword = data.hasPassword || [];
     S.checkinsBy = data.checkinsBy || { [PEOPLE[0]]: data.checkins || {} };
-    S.checkins = S.checkinsBy[S.person] || {};
+    syncPeople();
     S.journal = data.journal || [];
     S.notes = data.notes || [];
     S.loaded = true;
@@ -585,7 +600,16 @@ textarea.short { min-height: 76px; }
     }
   }
   const observers = () => (S.cfg && S.cfg.observers) || DEFAULT_OBSERVERS;
+  const peopleList = () => (S.cfg && Array.isArray(S.cfg.people) && S.cfg.people.length ? S.cfg.people : DEFAULT_PEOPLE);
+  function syncPeople() {
+    setPeople(peopleList());
+    if (!PEOPLE.includes(S.person)) { S.person = PEOPLE.includes(S.wanted) ? S.wanted : PEOPLE[0]; S.drafts = {}; }
+    S.checkins = S.checkinsBy[S.person] || {};
+  }
   function renderObservers() {
+    $("people-list").replaceChildren(...peopleList().map((p, i) => h("li", null,
+      h("span", null, p.name, i === 0 ? h("span", { class: "muted" }, "（管理者）") : p.joined ? h("span", { class: "muted" }, `（${prettyDate(p.joined)}加入）`) : null),
+      i > 0 && !Object.keys(S.checkinsBy[p.name] || {}).length ? deleteButton("移除", () => savePeople(peopleList().filter((x) => x.name !== p.name), `已移除實驗者 ${p.name}`)) : null)));
     const list = observers();
     $("observer-list").replaceChildren(...list.map((n) => h("li", null, h("span", null, n),
       list.length > 1 ? deleteButton("移除", () => setObservers(list.filter((x) => x !== n), "已移除觀察者")) : null)));
@@ -816,6 +840,7 @@ textarea.short { min-height: 76px; }
     empty.textContent = "還沒有留言。觀察者看到的變化可以寫在這裡。";
   }
   function render() {
+    syncPeople();
     clampSel();
     renderHeader(); renderTabs(); renderPeople(); renderToday(); renderOverview(); renderRules(); renderObservers(); renderJournal(); renderNotes();
   }
@@ -876,6 +901,14 @@ textarea.short { min-height: 76px; }
       toast("已打卡");
     }
     render();
+  }
+  function savePeople(list, msg) {
+    const next = baseCfg(), added = list.filter((p) => !PEOPLE.includes(p.name)).map((p) => p.name);
+    next.people = list;
+    /* newcomers start with an empty menu and pick their own practices (the backend does the same) */
+    next.practices = next.practices.map((p) => ({ ...p, by: { ...p.by, ...Object.fromEntries(added.map((n) => [n, { from: null, to: NEVER }])) } }));
+    lastRaw = ""; /* an old backend echoes the same data back, which must still undo the optimistic change */
+    saveCfg(next).then((ok) => ok && toast(S.cfg && S.cfg.people ? msg : "沒有存到，請先更新 Google 後端。"));
   }
   function setObservers(list, msg) {
     const next = baseCfg();
@@ -1013,12 +1046,22 @@ textarea.short { min-height: 76px; }
     const ok = await write("setPassword", { name, password });
     if (ok) { $("account-pass").value = ""; toast(`已設定 ${name} 的密碼`); }
   });
+  $("people-form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const name = $("people-name").value.trim();
+    if (!name) return;
+    if (PEOPLE.includes(name)) { toast("這位實驗者已經在清單裡。"); return; }
+    if (observers().includes(name)) { toast("這個名字已經是觀察者，請換一個名字。"); return; }
+    $("people-name").value = "";
+    savePeople([...peopleList(), { name, joined: started() ? today() : null }], `已加入實驗者 ${name}，請他登入後設定密碼並選定課菜單`);
+  });
   $("observer-form").addEventListener("submit", (e) => {
     e.preventDefault();
     const name = $("observer-name").value.trim();
     if (!name) return;
     $("observer-name").value = "";
     if (observers().includes(name)) { toast("這位觀察者已經在清單裡。"); return; }
+    if (PEOPLE.includes(name)) { toast("這個名字已經是實驗者。"); return; }
     setObservers([...observers(), name], "已加入觀察者");
   });
   $("add-form").addEventListener("submit", (e) => {
