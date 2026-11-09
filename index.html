@@ -364,7 +364,8 @@ textarea.short { min-height: 76px; }
   const $ = (id) => document.getElementById(id);
   const WEEK = ["日", "一", "二", "三", "四", "五", "六"];
   const VIEWS = ["checkin", "overview", "journal", "notes", "rules"];
-  const PEOPLE = ["邱子芸", "江宇熙"];
+  const PEOPLE = ["邱子芸", "江宇熙", "邱家瑋"];
+  const JOINED = { "邱家瑋": "2026-11-09" }; /* people who joined after day one; earlier days do not count for them */
   const DEFAULT_OBSERVERS = ["邱美琪", "張克強"];
   const LOCK_MSG = "這天已鎖定，只能從後台修改。";
   const LEFT_PRACTICES = /接破曉|拳|嗯啊|光的冥想|大悲咒/;
@@ -406,11 +407,12 @@ textarea.short { min-height: 76px; }
   const lastDay = () => addDays(S.cfg.startDate, S.cfg.days - 1);
   const lastElapsed = () => { const t = today(), e = lastDay(); return t < e ? t : e; };
   const started = () => !!S.cfg && today() >= S.cfg.startDate;
+  const firstDay = () => [S.cfg.startDate, JOINED[S.person]].filter(Boolean).sort().pop();
   /* p.by[name] = { from, to } narrows a practice for one person; no entry means the shared addedOn / removedOn apply */
   const NEVER = "2000-01-01";
   const byOf = (p, who) => (p.by && p.by[who]) || {};
   const applies = (p, date, who = S.person) => {
-    const o = byOf(p, who), from = o.from || p.addedOn;
+    const o = byOf(p, who), from = [o.from || p.addedOn, JOINED[who]].filter(Boolean).sort().pop();
     return (!from || date >= from) && (!p.removedOn || date < p.removedOn) && (!o.to || date < o.to);
   };
   const doesNow = (p, who = S.person) => !p.removedOn && !byOf(p, who).to;
@@ -620,7 +622,7 @@ textarea.short { min-height: 76px; }
     if (!S.cfg || !started()) { S.selDate = null; return; }
     const end = lastElapsed();
     if (!S.selDate || S.selDate > end) S.selDate = end;
-    if (S.selDate < S.cfg.startDate) S.selDate = S.cfg.startDate;
+    if (S.selDate < firstDay()) S.selDate = firstDay();
   }
   function renderToday() {
     const g = $("today-group");
@@ -639,9 +641,9 @@ textarea.short { min-height: 76px; }
     }
     const sel = S.selDate, end = lastElapsed(), isToday = sel === today();
     const input = $("check-date");
-    input.min = S.cfg.startDate; input.max = end;
+    input.min = firstDay(); input.max = end;
     if (document.activeElement !== input) input.value = sel;
-    $("prev-day").disabled = sel <= S.cfg.startDate;
+    $("prev-day").disabled = sel <= firstDay();
     $("next-day").disabled = sel >= end;
     $("go-today").hidden = isToday || today() > end;
     const saved = doneMap(sel), picked = draftOf(sel), closed = overdue(sel);
@@ -702,7 +704,7 @@ textarea.short { min-height: 76px; }
     const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
     for (let n = 1; n <= daysInMonth; n++) {
       const d = `${S.month}-${pad(n)}`;
-      if (d < S.cfg.startDate || d > lastDay()) { cells.push(h("div", { class: "day outside" }, String(n))); continue; }
+      if (d < firstDay() || d > lastDay()) { cells.push(h("div", { class: "day outside" }, String(n))); continue; }
       const future = !started() || d > t;
       const s = dayScore(d), rest = !!restReason(d);
       const extra = rest && practicesOn(d).some((p) => doneMap(d)[p.id]);
@@ -724,7 +726,7 @@ textarea.short { min-height: 76px; }
     $("week-label").textContent = `${short(week[0])} – ${short(week[6])}`;
     $("prev-week").disabled = S.week <= firstWeek;
     $("next-week").disabled = S.week >= lastWeek;
-    const dates = week.filter((d) => started() && d >= S.cfg.startDate && d <= t);
+    const dates = week.filter((d) => started() && d >= firstDay() && d <= t);
     const head = h("tr", null, h("th", { class: "name", scope: "col" }, "定課"), week.map((d) => (
       h("th", { scope: "col", class: d === today() ? "now" : null }, short(d), h("small", null, `週${WEEK[weekdayOf(d)]}`))
     )));
@@ -958,7 +960,7 @@ textarea.short { min-height: 76px; }
   $("go-today").addEventListener("click", () => { S.selDate = today(); render(); });
   $("check-date").addEventListener("change", (e) => {
     const d = e.target.value;
-    if (!d || d < S.cfg.startDate || d > lastElapsed()) { toast("這個日期不在可打卡的範圍內。"); e.target.value = S.selDate; return; }
+    if (!d || d < firstDay() || d > lastElapsed()) { toast("這個日期不在可打卡的範圍內。"); e.target.value = S.selDate; return; }
     S.selDate = d; render();
   });
   $("rule-text").addEventListener("change", (e) => saveRules({ text: e.target.value.trim() }, "已更新規則"));

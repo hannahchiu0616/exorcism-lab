@@ -5,7 +5,7 @@
 //   2. 上方函式選 setup → 執行 → 授權
 //   3. 部署 → 新增部署作業 → 網頁應用程式 → 執行身分「我」、存取權「所有人」→ 部署 → 複製網址
 
-const PEOPLE = ["邱子芸", "江宇熙"];
+const PEOPLE = ["邱子芸", "江宇熙", "邱家瑋"];
 const ADMIN = PEOPLE[0];
 const DEFAULT_OBSERVERS = ["邱美琪", "張克強"];
 const NEVER = "2000-01-01"; // 定課的 by[人].to 設成這天，代表這個人從沒做過
