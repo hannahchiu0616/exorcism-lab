@@ -668,8 +668,9 @@ textarea.short { min-height: 76px; }
         h("span", { class: "seal", "aria-hidden": "true" }, "✓"),
         h("span", { class: "prac-text" }, h("b", null, p.name), p.note ? h("small", null, p.note) : null, locked ? h("small", null, "已打卡") : null));
     };
-    const leftCol = list.filter((p) => LEFT_PRACTICES.test(p.name)), rightCol = list.filter((p) => !LEFT_PRACTICES.test(p.name));
-    const rows = Math.max(leftCol.length, rightCol.length);
+    /* keep the usual grouping order, then split it evenly so neither column runs long */
+    const ordered = [...list.filter((p) => LEFT_PRACTICES.test(p.name)), ...list.filter((p) => !LEFT_PRACTICES.test(p.name))];
+    const rows = Math.ceil(ordered.length / 2), leftCol = ordered.slice(0, rows), rightCol = ordered.slice(rows);
     const column = (items) => h("div", { class: "prac-col", style: `--rows: ${rows}` }, items.map(pracButton));
     g.append(h("div", { class: "pracs" }, column(leftCol), column(rightCol)));
     const changed = !sameDone(picked, saved);
