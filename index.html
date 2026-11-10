@@ -269,7 +269,7 @@ textarea.short { min-height: 76px; }
   </section>
 
   <section class="panel" id="view-notes" role="tabpanel" aria-labelledby="tab-notes" hidden>
-    <p class="muted" id="notes-experimenter" hidden>留言板只有驅魔師能看。</p>
+    <p class="muted" id="notes-experimenter" hidden>每則留言只有寫的人自己看得到，被留言的人看不到。</p>
     <form id="note-form">
       <h2 id="note-heading">留下一則留言</h2>
       <label class="field">留言內容
@@ -628,11 +628,14 @@ textarea.short { min-height: 76px; }
     }
   }
   const isObserver = () => !!S.me && !PEOPLE.includes(S.me);
+  /* warriors never leave notes for themselves, so the board falls back to the first other person */
+  const noteTo = () => (S.person === S.me ? PEOPLE.find((n) => n !== S.me) : S.person);
   function renderPeople() {
-    const bar = $("people"), buttons = () => PEOPLE.map((p) => h("button", { type: "button", "aria-pressed": String(p === S.person), on: { click: () => pickPerson(p) } }, p));
+    const notes = S.view === "notes", bar = $("people");
+    const buttons = (skip) => PEOPLE.filter((p) => p !== skip).map((p) => h("button", { type: "button", "aria-pressed": String(p === (skip ? noteTo() : S.person)), on: { click: () => pickPerson(p) } }, p));
     const gated = S.view === "notes" || S.view === "rules" || S.view === "journal";
     const menu = $("login-name"), chosen = menu.value;
-    const names = S.view === "journal" ? PEOPLE : S.view === "notes" ? observers() : [...PEOPLE, ...observers()];
+    const names = S.view === "journal" ? PEOPLE : S.view === "notes" ? [...observers(), ...PEOPLE] : [...PEOPLE, ...observers()];
     if (document.activeElement !== menu) {
       menu.replaceChildren(h("option", { value: "" }, "請選擇姓名"), ...names.map((n) => h("option", null, n)));
       menu.value = names.includes(chosen) ? chosen : "";
@@ -640,9 +643,9 @@ textarea.short { min-height: 76px; }
     $("login-form").hidden = !gated || !!S.me;
     $("who-bar").hidden = !gated || !S.me;
     $("who-name").textContent = `已登入：${S.me}`;
-    $("login-hint").textContent = S.view === "journal" ? "心路歷程只有本人能寫和看，請先登入。" : S.view === "notes" ? "留言板只有驅魔師能看，請先登入。" : "規則大家都可以看，邱子芸登入後可以修改；定課菜單由驅魔勇士本人登入後選。";
-    bar.hidden = S.view === "rules" || S.view === "journal" || (S.view === "notes" && !isObserver());
-    bar.replaceChildren(...buttons());
+    $("login-hint").textContent = S.view === "journal" ? "心路歷程只有本人能寫和看，請先登入。" : S.view === "notes" ? "留言要先登入，每則留言只有寫的人自己看得到。" : "規則大家都可以看，邱子芸登入後可以修改；定課菜單由驅魔勇士本人登入後選。";
+    bar.hidden = S.view === "rules" || S.view === "journal" || (S.view === "notes" && !S.me);
+    bar.replaceChildren(...buttons(notes ? S.me : null));
     $("rest-people").replaceChildren(...buttons());
     $("menu-people").replaceChildren(...buttons());
   }
@@ -824,11 +827,12 @@ textarea.short { min-height: 76px; }
     empty.textContent = "還沒有紀錄。用上方表單寫下第一篇。";
   }
   function renderNotes() {
-    $("note-form").hidden = !isObserver();
-    $("note-group").hidden = !isObserver();
-    $("notes-experimenter").hidden = !S.me || isObserver();
-    $("note-heading").textContent = `留言給 ${S.person}`;
-    const list = S.notes.filter((n) => (n.person || PEOPLE[0]) === S.person).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    /* everyone signed in may leave notes, warriors only for the other warriors; each note stays private to its writer */
+    $("note-form").hidden = !S.me;
+    $("note-group").hidden = !S.me;
+    $("notes-experimenter").hidden = !S.me;
+    $("note-heading").textContent = `留言給 ${noteTo()}`;
+    const list = S.notes.filter((n) => (n.person || PEOPLE[0]) === noteTo()).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
     $("note-list").replaceChildren(...list.map((n) => {
       const date = n.createdAt ? toIso(new Date(n.createdAt)) : null;
       return h("li", { class: "entry" },
@@ -841,7 +845,7 @@ textarea.short { min-height: 76px; }
     }));
     const empty = $("note-empty");
     empty.hidden = !S.loaded || list.length > 0;
-    empty.textContent = "還沒有留言。驅魔師看到的變化可以寫在這裡。";
+    empty.textContent = "還沒有留言。你看到的變化可以寫在這裡。";
   }
   function render() {
     syncPeople();
@@ -977,7 +981,7 @@ textarea.short { min-height: 76px; }
   function routeFromHash() {
     const v = location.hash.slice(1);
     S.view = VIEWS.includes(v) ? v : "checkin";
-    renderTabs(); renderPeople();
+    renderTabs(); renderPeople(); renderNotes();
   }
   window.addEventListener("hashchange", routeFromHash);
   document.addEventListener("visibilitychange", () => {
@@ -1107,7 +1111,7 @@ textarea.short { min-height: 76px; }
     e.preventDefault();
     const body = $("note-body").value.trim();
     if (!body) return;
-    const ok = await write("addNote", { person: S.person, body: sheetSafe(body) });
+    const ok = await write("addNote", { person: noteTo(), body: sheetSafe(body) });
     if (ok) { $("note-body").value = ""; toast("留言已送出"); }
   });
 

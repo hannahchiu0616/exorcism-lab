@@ -74,8 +74,8 @@ function login(ss, p) {
   cache.remove(key);
   return makeSession(name);
 }
-// 留言只有寫的那位驅魔師看得到，實驗者不能看
-const canSeeNote = (n, me) => !!me && PEOPLE.indexOf(me) < 0 && n.role === me;
+// 每則留言只有寫的人看得到，被留言的驅魔勇士看不到
+const canSeeNote = (n, me) => !!me && n.role === me;
 
 /* ---------- 安裝 ---------- */
 function setup() {
@@ -239,7 +239,7 @@ function cleanDone(d) {
 /* ---------- 網址入口 ---------- */
 function out(obj) { return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON); }
 
-const VERSION = "2026-11-10 實驗者名單"; // 打開網頁應用程式網址就看得到，用來確認部署的是哪一版
+const VERSION = "2026-11-10 勇士留言"; // 打開網頁應用程式網址就看得到，用來確認部署的是哪一版
 function doGet() { return out({ ok: true, service: "exorcism-lab", version: VERSION }); }
 
 function doPost(e) {
@@ -364,7 +364,8 @@ function applyWrite(ss, p, me) {
       return;
     }
     case "addNote": {
-      if (!me || PEOPLE.indexOf(me) >= 0) throw appError("invalid", "請用驅魔師身分登入後留言");
+      if (!me) throw appError("invalid", "請先登入再留言");
+      if (person(p.person) === me) throw appError("invalid", "不能留言給自己");
       const sh = tab(ss, "留言");
       put(sh, sh.getLastRow() + 1, [Utilities.getUuid(), text(p.body, 3000), Date.now(), me, person(p.person)]);
       return;
