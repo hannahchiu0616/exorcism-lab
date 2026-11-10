@@ -572,6 +572,8 @@ textarea.short { min-height: 76px; }
   /* a sheet cell reads a leading = as a formula; a leading ' makes it literal and is not stored */
   const sheetSafe = (s) => (/^[=']/.test(s) ? "'" + s : s);
   function saveCfg(next) {
+    /* never save before the stored settings have loaded: baseCfg would fall back to blank defaults and overwrite them */
+    if (!S.loaded) { toast("資料還在讀取中，請稍等幾秒再試。"); return Promise.resolve(false); }
     S.cfg = next; render();
     return write("saveConfig", { cfg: next });
   }
