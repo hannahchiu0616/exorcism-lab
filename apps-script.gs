@@ -144,6 +144,20 @@ function upsert(sh, key, values) {
   put(sh, findRow(sh, key) || sh.getLastRow() + 1, values);
 }
 
+// 公佈欄：每月 15 號和 30 號（沒有 30 號的月份用月底）台灣時間 0 點公布，在那之前寫的留言，登入的人都看得到
+const twMidnight = (y, m, d) => Date.UTC(y, m - 1, d) - 8 * 3600000;
+function lastPublish(now) {
+  const tw = new Date(now + 8 * 3600000);
+  let y = tw.getUTCFullYear(), m = tw.getUTCMonth() + 1;
+  for (let k = 0; k < 3; k++) {
+    const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+    const times = [15, Math.min(30, last)].map(d => twMidnight(y, m, d)).filter(t => t <= now);
+    if (times.length) return Math.max.apply(null, times);
+    m--; if (!m) { m = 12; y--; }
+  }
+  return 0;
+}
+
 function snapshot(ss, me) {
   const settings = {};
   rows(ss, "設定").forEach(r => { settings[r[0]] = r[1]; });
@@ -155,6 +169,8 @@ function snapshot(ss, me) {
   });
   const cfg = parse(settings["實驗"], null);
   if (cfg) cfg.observers = observers(ss);
+  const allNotes = rows(ss, "留言").map(r => ({ id: r[0], body: r[1], createdAt: Number(r[2]) || 0, role: r[3], person: r[4] || ADMIN }));
+  const cutoff = lastPublish(Date.now());
   return {
     cfg: cfg,
     checkins: by[ADMIN],
@@ -163,8 +179,9 @@ function snapshot(ss, me) {
       id: r[0], date: r[1], energy: r[2] ? Number(r[2]) : null, body: r[3],
       createdAt: Number(r[4]) || 0, editedAt: Number(r[5]) || 0, person: r[6] || ADMIN,
     })).filter(e => e.person === me),
-    notes: rows(ss, "留言").map(r => ({ id: r[0], body: r[1], createdAt: Number(r[2]) || 0, role: r[3], person: r[4] || ADMIN }))
-      .filter(n => canSeeNote(n, me)),
+    notes: allNotes.filter(n => canSeeNote(n, me)),
+    board: me ? allNotes.filter(n => n.createdAt && n.createdAt < cutoff) : [],
+    published: cutoff,
     me: me || null,
     hasPassword: me === ADMIN ? users(ss).filter(n => props().getProperty("pw:" + n)) : [],
   };
@@ -239,7 +256,7 @@ function cleanDone(d) {
 /* ---------- 網址入口 ---------- */
 function out(obj) { return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON); }
 
-const VERSION = "2026-11-10 勇士留言"; // 打開網頁應用程式網址就看得到，用來確認部署的是哪一版
+const VERSION = "2026-11-10 公佈欄"; // 打開網頁應用程式網址就看得到，用來確認部署的是哪一版
 function doGet() { return out({ ok: true, service: "exorcism-lab", version: VERSION }); }
 
 function doPost(e) {

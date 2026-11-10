@@ -191,6 +191,7 @@ textarea.short { min-height: 76px; }
     <button class="tab" role="tab" id="tab-overview" data-view="overview" type="button">打卡紀錄</button>
     <button class="tab" role="tab" id="tab-journal" data-view="journal" type="button">驅魔勇士心路歷程</button>
     <button class="tab" role="tab" id="tab-notes" data-view="notes" type="button">驅魔師留言板</button>
+    <button class="tab" role="tab" id="tab-board" data-view="board" type="button">公佈欄</button>
     <button class="tab" role="tab" id="tab-rules" data-view="rules" type="button">規則</button>
   </div>
 </nav>
@@ -270,7 +271,7 @@ textarea.short { min-height: 76px; }
 
   <section class="panel" id="view-notes" role="tabpanel" aria-labelledby="tab-notes" hidden>
     <p class="notice">請不帶任何情緒的留言</p>
-    <p class="muted" id="notes-experimenter" hidden>每則留言只有寫的人自己看得到，被留言的人看不到。</p>
+    <p class="muted" id="notes-experimenter" hidden>留言會在每月 15 號和 30 號公布到「公佈欄」，所有登入的人都看得到內容和是誰寫的。</p>
     <form id="note-form">
       <h2 id="note-heading">留下一則留言</h2>
       <label class="field">留言內容
@@ -283,6 +284,12 @@ textarea.short { min-height: 76px; }
       <ol class="entries" id="note-list"></ol>
       <p class="empty" id="note-empty" hidden></p>
     </div>
+  </section>
+
+  <section class="panel" id="view-board" role="tabpanel" aria-labelledby="tab-board" hidden>
+    <p class="notice" id="board-when"></p>
+    <div id="board-list"></div>
+    <p class="empty" id="board-empty" hidden></p>
   </section>
 
   <section class="panel" id="view-rules" role="tabpanel" aria-labelledby="tab-rules" hidden>
@@ -375,7 +382,7 @@ textarea.short { min-height: 76px; }
 (() => {
   const $ = (id) => document.getElementById(id);
   const WEEK = ["日", "一", "二", "三", "四", "五", "六"];
-  const VIEWS = ["checkin", "overview", "journal", "notes", "rules"];
+  const VIEWS = ["checkin", "overview", "journal", "notes", "board", "rules"];
   /* the experimenter list lives in the config; the first person is the admin and people who joined later count from their join day */
   const DEFAULT_PEOPLE = [{ name: "邱子芸", joined: null }, { name: "江宇熙", joined: null }, { name: "邱家瑋", joined: "2026-11-09" }];
   let PEOPLE, JOINED;
@@ -535,6 +542,7 @@ textarea.short { min-height: 76px; }
     syncPeople();
     S.journal = data.journal || [];
     S.notes = data.notes || [];
+    S.board = data.board || []; S.hasBoard = Array.isArray(data.board);
     S.loaded = true;
     render();
   }
@@ -631,10 +639,40 @@ textarea.short { min-height: 76px; }
   const isObserver = () => !!S.me && !PEOPLE.includes(S.me);
   /* warriors never leave notes for themselves, so the board falls back to the first other person */
   const noteTo = () => (S.person === S.me ? PEOPLE.find((n) => n !== S.me) : S.person);
+  /* notes are published at local midnight on the 15th and the 30th (the last day in shorter months) */
+  function nextPublish() {
+    const t = today();
+    for (let k = 0; k < 2; k++) {
+      const [y, m] = addDays(`${t.slice(0, 7)}-01`, k * 31).split("-").map(Number);
+      const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+      const hit = [15, Math.min(30, last)].map((d) => `${y}-${pad(m)}-${pad(d)}`).find((d) => d > t);
+      if (hit) return hit;
+    }
+    return null;
+  }
+  function renderBoard() {
+    const next = nextPublish(), mine = PEOPLE.includes(S.me);
+    $("board-when").textContent = `每月 15 號和 30 號（沒有 30 號的月份在月底）會公布驅魔師留言板的留言。下次公布：${next ? prettyDate(next) : "—"}`;
+    const empty = $("board-empty"), list = $("board-list");
+    if (!S.me || !S.loaded) { list.replaceChildren(); empty.hidden = true; return; }
+    if (!S.hasBoard) { list.replaceChildren(); empty.hidden = false; empty.textContent = "公佈欄還沒開啟，請先更新 Google 後端。"; return; }
+    /* my own advice first, then everyone else in the usual order */
+    const order = [...(mine ? [S.me] : []), ...PEOPLE.filter((n) => n !== S.me)];
+    const groups = order.map((name) => [name, S.board.filter((n) => (n.person || PEOPLE[0]) === name).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))]).filter(([, l]) => l.length);
+    list.replaceChildren(...groups.map(([name, l]) => h("div", { class: "group" },
+      h("h2", null, name === S.me ? `給我的建議（${l.length}）` : `給 ${name} 的建議（${l.length}）`),
+      h("ol", { class: "entries" }, l.map((n) => h("li", { class: "entry" },
+        h("div", { class: "meta" },
+          h("b", null, n.role && n.role !== "observer" && n.role !== "experimenter" ? n.role : "驅魔師"),
+          n.createdAt ? h("span", null, stamp(n.createdAt)) : null),
+        h("p", { class: "text" }, n.body)))))));
+    empty.hidden = groups.length > 0;
+    empty.textContent = "還沒有公布的留言。";
+  }
   function renderPeople() {
     const notes = S.view === "notes", bar = $("people");
     const buttons = (skip) => PEOPLE.filter((p) => p !== skip).map((p) => h("button", { type: "button", "aria-pressed": String(p === (skip ? noteTo() : S.person)), on: { click: () => pickPerson(p) } }, p));
-    const gated = S.view === "notes" || S.view === "rules" || S.view === "journal";
+    const gated = S.view === "notes" || S.view === "board" || S.view === "rules" || S.view === "journal";
     const menu = $("login-name"), chosen = menu.value;
     const names = S.view === "journal" ? PEOPLE : S.view === "notes" ? [...observers(), ...PEOPLE] : [...PEOPLE, ...observers()];
     if (document.activeElement !== menu) {
@@ -644,8 +682,8 @@ textarea.short { min-height: 76px; }
     $("login-form").hidden = !gated || !!S.me;
     $("who-bar").hidden = !gated || !S.me;
     $("who-name").textContent = `已登入：${S.me}`;
-    $("login-hint").textContent = S.view === "journal" ? "心路歷程只有本人能寫和看，請先登入。" : S.view === "notes" ? "留言要先登入，每則留言只有寫的人自己看得到。" : "規則大家都可以看，邱子芸登入後可以修改；定課菜單由驅魔勇士本人登入後選。";
-    bar.hidden = S.view === "rules" || S.view === "journal" || (S.view === "notes" && !S.me);
+    $("login-hint").textContent = S.view === "journal" ? "心路歷程只有本人能寫和看，請先登入。" : S.view === "board" ? "公佈欄要先登入才能看。" : S.view === "notes" ? "留言要先登入。留言會在每月 15 號和 30 號公布到公佈欄。" : "規則大家都可以看，邱子芸登入後可以修改；定課菜單由驅魔勇士本人登入後選。";
+    bar.hidden = S.view === "rules" || S.view === "journal" || S.view === "board" || (S.view === "notes" && !S.me);
     bar.replaceChildren(...buttons(notes ? S.me : null));
     $("rest-people").replaceChildren(...buttons());
     $("menu-people").replaceChildren(...buttons());
@@ -851,7 +889,7 @@ textarea.short { min-height: 76px; }
   function render() {
     syncPeople();
     clampSel();
-    renderHeader(); renderTabs(); renderPeople(); renderToday(); renderOverview(); renderRules(); renderObservers(); renderJournal(); renderNotes();
+    renderHeader(); renderTabs(); renderPeople(); renderToday(); renderOverview(); renderRules(); renderObservers(); renderJournal(); renderNotes(); renderBoard();
   }
 
   /* ---- actions ---- */
@@ -982,7 +1020,7 @@ textarea.short { min-height: 76px; }
   function routeFromHash() {
     const v = location.hash.slice(1);
     S.view = VIEWS.includes(v) ? v : "checkin";
-    renderTabs(); renderPeople(); renderNotes();
+    renderTabs(); renderPeople(); renderNotes(); renderBoard();
   }
   window.addEventListener("hashchange", routeFromHash);
   document.addEventListener("visibilitychange", () => {
@@ -1032,7 +1070,7 @@ textarea.short { min-height: 76px; }
     }
   });
   $("logout").addEventListener("click", () => {
-    setAuth(null); S.notes = []; S.journal = []; S.hasPassword = []; lastRaw = ""; writes++;
+    setAuth(null); S.notes = []; S.board = []; S.journal = []; S.hasPassword = []; lastRaw = ""; writes++;
     if (S.editing) resetJournal();
     render(); refresh();
   });
