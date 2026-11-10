@@ -321,7 +321,7 @@ textarea.short { min-height: 76px; }
       </div>
       <div id="people-group" class="group">
       <h2>驅魔勇士</h2>
-      <p class="muted">新加入的驅魔勇士從加入當天開始算，之前的日子不列入打卡和完成率。已經有打卡紀錄的驅魔勇士不能移除。</p>
+      <p class="muted">邱子芸是管理者，不在打卡名單裡。新加入的驅魔勇士從加入當天開始算，之前的日子不列入打卡和完成率。已經有打卡紀錄的驅魔勇士不能移除。</p>
       <ul class="edit-list" id="people-list"></ul>
       <form id="people-form">
         <label class="field">驅魔勇士姓名<input type="text" id="people-name" maxlength="20" required></label>
@@ -350,11 +350,9 @@ textarea.short { min-height: 76px; }
   const WEEK = ["日", "一", "二", "三", "四", "五", "六"];
   const VIEWS = ["checkin", "overview", "journal", "rules"];
   /* the experimenter list lives in the config; the first person is the admin and people who joined later count from their join day */
-  const DEFAULT_PEOPLE = [{ name: "邱子芸", joined: null }, { name: "姵蓉", joined: null }];
-  /* 邱子芸 checks in at the original lab; the backend copies her check-ins here by practice name, read-only. Her menu and rest days are her own here. */
-  const MIRROR = "邱子芸";
-  const SOURCE_SITE = "https://hannahchiu0616.github.io/exorcism-lab/";
-  const isMirror = (who = S.person) => who === MIRROR;
+  const DEFAULT_PEOPLE = [{ name: "姵蓉", joined: null }];
+  /* 邱子芸 runs this lab without checking in: she signs in only to change the rules, the period and passwords */
+  const ADMIN = "邱子芸";
   let PEOPLE, JOINED;
   const setPeople = (list) => {
     PEOPLE = list.map((p) => p.name);
@@ -428,7 +426,7 @@ textarea.short { min-height: 76px; }
   const currentPractices = () => (S.cfg ? S.cfg.practices : []).filter((p) => !p.removedOn);
   const myPractices = () => (S.cfg ? S.cfg.practices : []).filter((p) => doesNow(p));
   /* before anyone has checked in, a change reaches back to the first day */
-  const changeDate = () => (Object.entries(S.checkinsBy).some(([who, c]) => !isMirror(who) && Object.keys(c).length) ? today() : null);
+  const changeDate = () => (Object.values(S.checkinsBy).some((c) => Object.keys(c).length) ? today() : null);
   const doneMap = (date) => (S.checkins[date] && S.checkins[date].done) || {};
   const dayScore = (date) => {
     const list = activeOn(date), done = doneMap(date);
@@ -510,7 +508,6 @@ textarea.short { min-height: 76px; }
     S.checkinsBy = data.checkinsBy || { [PEOPLE[0]]: data.checkins || {} };
     syncPeople();
     S.journal = data.journal || [];
-    S.mirrorState = data.mirror || null;
     S.loaded = true;
     render();
   }
@@ -541,7 +538,7 @@ textarea.short { min-height: 76px; }
     try {
       const d = await call("getAll");
       if (startedAt === writes && !inFlight) applyData(d.data);
-      setBanner(S.mirrorState && !S.mirrorState.ok ? `暫時同步不到原本的驅魔實驗室，${MIRROR}的紀錄可能不是最新的。` : "");
+      setBanner("");
     } catch (e) {
       setBanner("暫時連不上紀錄，稍後會自動重試。");
     }
@@ -588,13 +585,13 @@ textarea.short { min-height: 76px; }
   }
   function renderObservers() {
     $("people-list").replaceChildren(...peopleList().map((p, i) => h("li", null,
-      h("span", null, p.name, i === 0 ? h("span", { class: "muted" }, "（管理者）") : p.joined ? h("span", { class: "muted" }, `（${prettyDate(p.joined)}加入）`) : null),
-      i > 0 && !isMirror(p.name) && !Object.keys(S.checkinsBy[p.name] || {}).length ? deleteButton("移除", () => savePeople(peopleList().filter((x) => x.name !== p.name), `已移除驅魔勇士 ${p.name}`)) : null)));
-    const names = PEOPLE, select = $("account-name"), chosen = select.value;
-    $("account-group").hidden = S.me !== PEOPLE[0];
+      h("span", null, p.name, p.joined ? h("span", { class: "muted" }, `（${prettyDate(p.joined)}加入）`) : null),
+      PEOPLE.length > 1 && !Object.keys(S.checkinsBy[p.name] || {}).length ? deleteButton("移除", () => savePeople(peopleList().filter((x) => x.name !== p.name), `已移除驅魔勇士 ${p.name}`)) : null)));
+    const names = [ADMIN, ...PEOPLE], select = $("account-name"), chosen = select.value;
+    $("account-group").hidden = S.me !== ADMIN;
     $("my-pass-form").hidden = !S.me;
     $("account-list").replaceChildren(...names.map((n) => h("li", null, h("span", null, n), h("span", { class: "muted" }, S.hasPassword.includes(n) ? "已設定密碼" : "未設定"),
-      S.hasPassword.includes(n) && n !== PEOPLE[0] ? deleteButton("清除密碼", () => write("clearPassword", { name: n }).then((ok) => ok && toast(`已清除 ${n} 的密碼`))) : null)));
+      S.hasPassword.includes(n) && n !== ADMIN ? deleteButton("清除密碼", () => write("clearPassword", { name: n }).then((ok) => ok && toast(`已清除 ${n} 的密碼`))) : null)));
     if (document.activeElement !== select) {
       select.replaceChildren(...names.map((n) => h("option", null, n)));
       if (names.includes(chosen)) select.value = chosen;
@@ -605,7 +602,7 @@ textarea.short { min-height: 76px; }
     const buttons = () => PEOPLE.map((p) => h("button", { type: "button", "aria-pressed": String(p === S.person), on: { click: () => pickPerson(p) } }, p));
     const gated = S.view === "rules" || S.view === "journal";
     const menu = $("login-name"), chosen = menu.value;
-    const names = PEOPLE;
+    const names = S.view === "journal" ? PEOPLE : [...PEOPLE, ADMIN];
     if (document.activeElement !== menu) {
       menu.replaceChildren(h("option", { value: "" }, "請選擇姓名"), ...names.map((n) => h("option", null, n)));
       menu.value = names.includes(chosen) ? chosen : "";
@@ -640,7 +637,7 @@ textarea.short { min-height: 76px; }
       g.append(h("p", { class: "empty" }, `實驗從 ${prettyDate(S.cfg.startDate)} 開始，當天起就能打卡。`));
       return;
     }
-    const sel = S.selDate, end = lastElapsed(), isToday = sel === today(), view = isMirror();
+    const sel = S.selDate, end = lastElapsed(), isToday = sel === today();
     const input = $("check-date");
     input.min = firstDay(); input.max = end;
     if (document.activeElement !== input) input.value = sel;
@@ -651,7 +648,6 @@ textarea.short { min-height: 76px; }
     const reason = restReason(sel), list = practicesOn(sel), left = list.filter((p) => !saved[p.id]);
     $("day-label").textContent = `${prettyDate(sel)}　${dayLabel(sel)}　已打卡 ${list.length - left.length} / ${list.length}`;
     const word = isToday ? "今天" : "這天";
-    if (view) g.append(h("p", { class: "notice" }, `${MIRROR}在原本的驅魔實驗室打卡，同名的定課會自動同步過來，不能在這裡打卡。`, " ", h("a", { href: SOURCE_SITE }, "到原本的驅魔實驗室")));
     g.append(closed
       ? h("div", { class: "remain" }, h("b", null, "這天已鎖定"), h("span", null, `${!reason && left.length ? `未打卡：${left.map((p) => p.name).join("、")}。` : ""}超過隔天中午 12 點，只能從後台修改。`))
       : reason
@@ -665,7 +661,7 @@ textarea.short { min-height: 76px; }
       return h("button", {
         class: "prac" + (locked ? " locked" : closed ? " closed" : S.justStamped === p.id && isDone ? " stamp" : ""),
         type: "button", role: "checkbox", "aria-checked": String(isDone), "data-pid": p.id,
-        disabled: locked || closed || view, on: { click: () => toggle(p.id) },
+        disabled: locked || closed, on: { click: () => toggle(p.id) },
       },
         h("span", { class: "seal", "aria-hidden": "true" }, "✓"),
         h("span", { class: "prac-text" }, h("b", null, p.name), p.note ? h("small", null, p.note) : null, locked ? h("small", null, "已打卡") : null));
@@ -676,7 +672,7 @@ textarea.short { min-height: 76px; }
     const column = (items) => h("div", { class: "prac-col", style: `--rows: ${rows}` }, items.map(pracButton));
     g.append(h("div", { class: "pracs" }, column(leftCol), column(rightCol)));
     const changed = !sameDone(picked, saved);
-    if (!closed && !view) g.append(h("div", { class: "actions submit-row" },
+    if (!closed) g.append(h("div", { class: "actions submit-row" },
       h("button", { class: "primary", id: "checkin-submit", type: "button", disabled: !changed || S.saving, on: { click: submitCheckin } },
         S.saving ? "打卡中……" : changed || !Object.keys(saved).length ? "打卡" : "已打卡"),
       left.length ? h("button", { class: "ghost", type: "button", on: { click: () => setAll(!allPicked) } }, allPicked ? "全部取消" : "全部勾選") : null));
@@ -763,8 +759,8 @@ textarea.short { min-height: 76px; }
     const start = $("set-start"), end = $("set-end");
     if (document.activeElement !== start) start.value = S.cfg ? S.cfg.startDate : (start.value || today());
     if (document.activeElement !== end) end.value = S.cfg ? lastDay() : (end.value || addDays(today(), DEFAULT_DAYS - 1));
-    const list = currentPractices(), canMenu = S.me === S.person || S.me === PEOPLE[0];
-    $("menu-hint").textContent = isMirror() && canMenu ? `這是${MIRROR}在這間實驗室的菜單。原本的驅魔實驗室裡同名定課的打卡會同步過來，名稱要一模一樣。` : canMenu ? `這是${S.person}自己的菜單，切換只影響${S.person}，過去的打卡紀錄會保留。` : `${S.person}登入後可以修改這份菜單。`;
+    const list = currentPractices(), canMenu = S.me === S.person || S.me === ADMIN;
+    $("menu-hint").textContent = canMenu ? `這是${S.person}自己的菜單，切換只影響${S.person}，過去的打卡紀錄會保留。` : `${S.person}登入後可以修改這份菜單。`;
     $("edit-list").replaceChildren(...(list.length ? list.map((p) => h("li", null,
       h("span", null, p.name, p.note ? `（${p.note}）` : ""),
       h("span", { class: "picks menu-pick" }, h("button", {
@@ -773,7 +769,7 @@ textarea.short { min-height: 76px; }
       canMenu && PEOPLE.every((who) => !doesNow(p, who)) ? deleteButton("移除", () => removePractice(p.id)) : null)) : [h("li", { class: "muted" }, "清單是空的，用下方表單加入。")]));
     $("add-form").hidden = !canMenu;
     $("add-submit").textContent = `加入${S.person}的定課`;
-    const admin = S.me === PEOPLE[0], panel = $("view-rules");
+    const admin = S.me === ADMIN, panel = $("view-rules");
     panel.classList.toggle("readonly", !admin);
     for (const el of panel.querySelectorAll("input:not(#my-pass, #add-form input), textarea, select, .picks:not(.menu-pick) button")) el.disabled = !admin;
   }
@@ -845,7 +841,6 @@ textarea.short { min-height: 76px; }
   }
   async function submitCheckin() {
     if (dayClosed() || needsBackendUpdate()) return;
-    if (isMirror()) { toast(`${MIRROR}請到原本的驅魔實驗室打卡。`); return; }
     const who = S.person;
     const date = S.selDate, done = clone(draftOf(date));
     S.saving = true;

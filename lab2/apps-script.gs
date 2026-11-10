@@ -1,17 +1,14 @@
 // 驅魔實驗室 2 後端
 // 資料存在部署者自己 Google 雲端硬碟裡的一份試算表（和原本的實驗室分開）。打卡等內容公開；心路歷程和修改規則要用姓名和密碼登入。
-// 邱子芸在原本的驅魔實驗室打卡；她的打卡每次讀取時從原本的實驗室同步過來（依定課名稱對應），在這裡只能看不能改。
-// 她的定課菜單和休息日在這裡另外設定，不跟原本的實驗室同步。
+// 驅魔勇士只有姵蓉；邱子芸是管理者，不打卡，登入後可以修改規則、實驗期間和密碼。
 // 安裝：
 //   1. 到 script.google.com 建立新專案，貼上這整段，存檔
 //   2. 上方函式選 setup → 執行 → 授權
 //   3. 部署 → 新增部署作業 → 網頁應用程式 → 執行身分「我」、存取權「所有人」→ 部署 → 複製網址
 
 const ADMIN = "邱子芸";
-// 實驗者名單存在設定裡，邱子芸可以從網頁的「規則」分頁新增；這是還沒存過名單時的預設值
-const DEFAULT_PEOPLE = [{ name: "邱子芸", joined: null }, { name: "姵蓉", joined: null }];
-const MIRROR = ADMIN; // 這個人的紀錄來自原本的實驗室
-const SOURCE_API = "https://script.google.com/macros/s/AKfycbyHMXCObmXzh1VNL9aL0vl6xC8JHrlRmGY83uN88fDpYnO5roRPZfF3bfiQYEmc-ccr/exec";
+// 驅魔勇士名單存在設定裡，邱子芸可以從網頁的「規則」分頁新增；這是還沒存過名單時的預設值（邱子芸不在名單裡）
+const DEFAULT_PEOPLE = [{ name: "姵蓉", joined: null }];
 let PEOPLE = DEFAULT_PEOPLE.map(p => p.name); // 每次請求開始時由 book() 從設定讀入
 const NEVER = "2000-01-01"; // 定課的 by[人].to 設成這天，代表這個人從沒做過
 
@@ -44,7 +41,7 @@ function setPassword(name, password) {
 function makeToken(name, exp) {
   return exp + "." + sign(name + "|" + exp, secret() + props().getProperty("pw:" + name));
 }
-const users = ss => PEOPLE;
+const users = ss => [ADMIN].concat(PEOPLE);
 function whoIs(ss, auth) {
   if (!auth || !auth.name || !auth.token) return "";
   const name = String(auth.name), exp = Number(String(auth.token).split(".")[0]);
@@ -82,38 +79,6 @@ function setup() {
     if (first) ss.deleteSheet(first);
   }
   Logger.log("試算表：" + SpreadsheetApp.openById(p.getProperty("sheetId")).getUrl());
-  const m = mirror(true);
-  Logger.log(m && !m.stale ? "已連上原本的實驗室，" + MIRROR + "有 " + Object.keys(m.checkins).length + " 天打卡" : "連不上原本的實驗室");
-}
-
-/* ---------- 從原本的實驗室同步 ---------- */
-// 讀原本實驗室的公開資料（不用登入）；結果快取 1 分鐘，連不上時用 6 小時內最後一次成功的結果
-function mirror(fresh) {
-  const cache = CacheService.getScriptCache();
-  const hit = !fresh && cache.get("mirror2");
-  if (hit) return parse(hit, null);
-  try {
-    const res = UrlFetchApp.fetch(SOURCE_API, { method: "post", contentType: "text/plain", payload: JSON.stringify({ action: "getAll" }), muteHttpExceptions: true, followRedirects: true });
-    const d = JSON.parse(res.getContentText());
-    if (!d.ok) throw new Error(d.error || "讀取失敗");
-    const src = d.data || {}, cfg = src.cfg || {};
-    const names = {};
-    (cfg.practices || []).forEach(p => { names[p.id] = String(p.name || "").trim(); });
-    // 每天打卡完成的定課，記成定課名稱
-    const checkins = {}, raw = (src.checkinsBy || {})[MIRROR] || {};
-    Object.keys(raw).forEach(date => {
-      const done = (raw[date] && raw[date].done) || {};
-      checkins[date] = Object.keys(done).filter(id => done[id] && names[id]).map(id => names[id]);
-    });
-    const m = { at: Date.now(), checkins: checkins };
-    const s = JSON.stringify(m);
-    try { cache.put("mirror2", s, 60); cache.put("mirrorLast2", s, 21600); } catch (e) { /* 太大就不快取 */ }
-    return m;
-  } catch (e) {
-    const last = parse(cache.get("mirrorLast2"), null);
-    if (last) last.stale = true;
-    return last;
-  }
 }
 
 /* ---------- 試算表 ---------- */
@@ -180,24 +145,14 @@ function snapshot(ss, me) {
     (by[who] = by[who] || {})[r[0]] = { done: parse(r[1], {}) };
   });
   const cfg = parse(settings["實驗"], null) || defaultCfg();
-  // 邱子芸的打卡換成原本實驗室的紀錄：原本那邊打卡的定課，對應到這裡同名的定課
-  const m = mirror(), ids = {};
-  (cfg.practices || []).forEach(p => { const n = String(p.name || "").trim(); (ids[n] = ids[n] || []).push(p.id); });
-  by[MIRROR] = {};
-  Object.keys((m && m.checkins) || {}).forEach(date => {
-    const done = {};
-    m.checkins[date].forEach(n => (ids[n] || []).forEach(id => { done[id] = true; }));
-    by[MIRROR][date] = { done: done };
-  });
   return {
     cfg: cfg,
-    checkins: by[ADMIN],
+    checkins: by[PEOPLE[0]] || {},
     checkinsBy: by,
     journal: rows(ss, "歷程").map(r => ({
       id: r[0], date: r[1], energy: r[2] ? Number(r[2]) : null, body: r[3],
       createdAt: Number(r[4]) || 0, editedAt: Number(r[5]) || 0, person: r[6] || ADMIN,
     })).filter(e => e.person === me),
-    mirror: { ok: !!m && !m.stale, at: m ? m.at : 0 },
     me: me || null,
     hasPassword: me === ADMIN ? users(ss).filter(n => props().getProperty("pw:" + n)) : [],
   };
@@ -207,7 +162,7 @@ function parse(s, fallback) { try { return JSON.parse(s); } catch (e) { return f
 /* ---------- 檢查 ---------- */
 function appError(code, message) { const e = new Error(message); e.appCode = code; return e; }
 const isDate = s => /^\d{4}-\d{2}-\d{2}$/.test(String(s || ""));
-const person = s => (PEOPLE.indexOf(s) >= 0 ? s : ADMIN);
+const person = s => { if (PEOPLE.indexOf(s) < 0) throw appError("invalid", "找不到這位驅魔勇士"); return s; };
 // 打卡期限：隔天中午 12 點（台灣時間，等於隔天的 UTC 04:00）
 function pastDeadline(date) {
   const [y, m, d] = date.split("-").map(Number);
@@ -224,10 +179,10 @@ function cleanRest(r) {
     restReasons: Object.keys(r.restReasons || {}).filter(isDate).slice(0, 366).reduce((o, d) => { o[d] = String(r.restReasons[d]).slice(0, 20); return o; }, {}),
   };
 }
-// 邱子芸固定排第一位；名字不能重複
+// 邱子芸是管理者，不放進驅魔勇士名單；名字不能重複，至少要有一位
 function cleanPeople(list) {
-  const src = Array.isArray(list) && list.length ? list : DEFAULT_PEOPLE;
-  const seen = {}, out = [{ name: ADMIN, joined: null }];
+  const src = Array.isArray(list) && list.some(p => p && String(p.name || "").trim() && String(p.name).trim() !== ADMIN) ? list : DEFAULT_PEOPLE;
+  const seen = {}, out = [];
   seen[ADMIN] = true;
   src.forEach(p => {
     const n = String((p && p.name) || "").trim().slice(0, 20);
@@ -271,7 +226,7 @@ function cleanDone(d) {
 /* ---------- 網址入口 ---------- */
 function out(obj) { return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON); }
 
-const VERSION = "2026-11-10 實驗室2"; // 打開網頁應用程式網址就看得到，用來確認部署的是哪一版
+const VERSION = "2026-11-10 實驗室2 只有姵蓉"; // 打開網頁應用程式網址就看得到，用來確認部署的是哪一版
 function doGet() { return out({ ok: true, service: "exorcism-lab-2", version: VERSION }); }
 
 function doPost(e) {
@@ -381,7 +336,6 @@ function applyWrite(ss, p, me) {
       if (pastDeadline(p.date)) throw appError("locked", "這天已鎖定，只能從後台修改。");
       {
         const sh = tab(ss, "打卡"), who = person(p.person);
-        if (who === MIRROR) throw appError("invalid", MIRROR + "請到原本的驅魔實驗室打卡");
         put(sh, findCheckin(sh, p.date, who) || sh.getLastRow() + 1, [p.date, JSON.stringify(cleanDone(p.done)), who]);
       }
       return;
