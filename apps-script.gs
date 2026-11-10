@@ -239,7 +239,8 @@ function cleanDone(d) {
 /* ---------- 網址入口 ---------- */
 function out(obj) { return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON); }
 
-function doGet() { return out({ ok: true, service: "exorcism-lab" }); }
+const VERSION = "2026-11-10 實驗者名單"; // 打開網頁應用程式網址就看得到，用來確認部署的是哪一版
+function doGet() { return out({ ok: true, service: "exorcism-lab", version: VERSION }); }
 
 function doPost(e) {
   try {
