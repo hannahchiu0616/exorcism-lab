@@ -190,7 +190,7 @@ textarea.short { min-height: 76px; }
     <button class="tab" role="tab" id="tab-checkin" data-view="checkin" type="button">每日打卡</button>
     <button class="tab" role="tab" id="tab-overview" data-view="overview" type="button">打卡紀錄</button>
     <button class="tab" role="tab" id="tab-journal" data-view="journal" type="button">實驗者心路歷程</button>
-    <button class="tab" role="tab" id="tab-notes" data-view="notes" type="button">觀察者留言板</button>
+    <button class="tab" role="tab" id="tab-notes" data-view="notes" type="button">驅魔師留言板</button>
     <button class="tab" role="tab" id="tab-rules" data-view="rules" type="button">規則</button>
   </div>
 </nav>
@@ -269,7 +269,7 @@ textarea.short { min-height: 76px; }
   </section>
 
   <section class="panel" id="view-notes" role="tabpanel" aria-labelledby="tab-notes" hidden>
-    <p class="muted" id="notes-experimenter" hidden>留言板只有觀察者能看。</p>
+    <p class="muted" id="notes-experimenter" hidden>留言板只有驅魔師能看。</p>
     <form id="note-form">
       <h2 id="note-heading">留下一則留言</h2>
       <label class="field">留言內容
@@ -347,11 +347,11 @@ textarea.short { min-height: 76px; }
       </form>
       </div>
       <div id="observer-group" class="group">
-      <h2>觀察者</h2>
+      <h2>驅魔師</h2>
       <ul class="edit-list" id="observer-list"></ul>
       <form id="observer-form">
-        <label class="field">觀察者姓名<input type="text" id="observer-name" maxlength="20" required></label>
-        <button class="primary" type="submit">加入觀察者</button>
+        <label class="field">驅魔師姓名<input type="text" id="observer-name" maxlength="20" required></label>
+        <button class="primary" type="submit">加入驅魔師</button>
       </form>
       </div>
     </div>
@@ -616,7 +616,7 @@ textarea.short { min-height: 76px; }
       i > 0 && !Object.keys(S.checkinsBy[p.name] || {}).length ? deleteButton("移除", () => savePeople(peopleList().filter((x) => x.name !== p.name), `已移除實驗者 ${p.name}`)) : null)));
     const list = observers();
     $("observer-list").replaceChildren(...list.map((n) => h("li", null, h("span", null, n),
-      list.length > 1 ? deleteButton("移除", () => setObservers(list.filter((x) => x !== n), "已移除觀察者")) : null)));
+      list.length > 1 ? deleteButton("移除", () => setObservers(list.filter((x) => x !== n), "已移除驅魔師")) : null)));
     const names = [...PEOPLE, ...list], select = $("account-name"), chosen = select.value;
     $("account-group").hidden = S.me !== PEOPLE[0];
     $("my-pass-form").hidden = !S.me;
@@ -640,7 +640,7 @@ textarea.short { min-height: 76px; }
     $("login-form").hidden = !gated || !!S.me;
     $("who-bar").hidden = !gated || !S.me;
     $("who-name").textContent = `已登入：${S.me}`;
-    $("login-hint").textContent = S.view === "journal" ? "心路歷程只有本人能寫和看，請先登入。" : S.view === "notes" ? "留言板只有觀察者能看，請先登入。" : "規則大家都可以看，邱子芸登入後可以修改；定課菜單由實驗者本人登入後選。";
+    $("login-hint").textContent = S.view === "journal" ? "心路歷程只有本人能寫和看，請先登入。" : S.view === "notes" ? "留言板只有驅魔師能看，請先登入。" : "規則大家都可以看，邱子芸登入後可以修改；定課菜單由實驗者本人登入後選。";
     bar.hidden = S.view === "rules" || S.view === "journal" || (S.view === "notes" && !isObserver());
     bar.replaceChildren(...buttons());
     $("rest-people").replaceChildren(...buttons());
@@ -841,7 +841,7 @@ textarea.short { min-height: 76px; }
     }));
     const empty = $("note-empty");
     empty.hidden = !S.loaded || list.length > 0;
-    empty.textContent = "還沒有留言。觀察者看到的變化可以寫在這裡。";
+    empty.textContent = "還沒有留言。驅魔師看到的變化可以寫在這裡。";
   }
   function render() {
     syncPeople();
@@ -1055,7 +1055,7 @@ textarea.short { min-height: 76px; }
     const name = $("people-name").value.trim();
     if (!name) return;
     if (PEOPLE.includes(name)) { toast("這位實驗者已經在清單裡。"); return; }
-    if (observers().includes(name)) { toast("這個名字已經是觀察者，請換一個名字。"); return; }
+    if (observers().includes(name)) { toast("這個名字已經是驅魔師，請換一個名字。"); return; }
     $("people-name").value = "";
     savePeople([...peopleList(), { name, joined: started() ? today() : null }], `已加入實驗者 ${name}，請他登入後設定密碼並選定課菜單`);
   });
@@ -1064,9 +1064,9 @@ textarea.short { min-height: 76px; }
     const name = $("observer-name").value.trim();
     if (!name) return;
     $("observer-name").value = "";
-    if (observers().includes(name)) { toast("這位觀察者已經在清單裡。"); return; }
+    if (observers().includes(name)) { toast("這位驅魔師已經在清單裡。"); return; }
     if (PEOPLE.includes(name)) { toast("這個名字已經是實驗者。"); return; }
-    setObservers([...observers(), name], "已加入觀察者");
+    setObservers([...observers(), name], "已加入驅魔師");
   });
   $("add-form").addEventListener("submit", (e) => {
     e.preventDefault();

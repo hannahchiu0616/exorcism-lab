@@ -74,7 +74,7 @@ function login(ss, p) {
   cache.remove(key);
   return makeSession(name);
 }
-// 留言只有寫的那位觀察者看得到，實驗者不能看
+// 留言只有寫的那位驅魔師看得到，實驗者不能看
 const canSeeNote = (n, me) => !!me && PEOPLE.indexOf(me) < 0 && n.role === me;
 
 /* ---------- 安裝 ---------- */
@@ -364,7 +364,7 @@ function applyWrite(ss, p, me) {
       return;
     }
     case "addNote": {
-      if (!me || PEOPLE.indexOf(me) >= 0) throw appError("invalid", "請用觀察者身分登入後留言");
+      if (!me || PEOPLE.indexOf(me) >= 0) throw appError("invalid", "請用驅魔師身分登入後留言");
       const sh = tab(ss, "留言");
       put(sh, sh.getLastRow() + 1, [Utilities.getUuid(), text(p.body, 3000), Date.now(), me, person(p.person)]);
       return;
