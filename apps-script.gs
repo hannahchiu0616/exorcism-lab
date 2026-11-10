@@ -273,7 +273,7 @@ function doPost(e) {
 
 // 心路歷程只有實驗者本人能寫和看
 function ownJournalRow(sh, id, me) {
-  if (PEOPLE.indexOf(me) < 0) throw appError("invalid", "請用實驗者本人的帳號登入");
+  if (PEOPLE.indexOf(me) < 0) throw appError("invalid", "請用驅魔勇士本人的帳號登入");
   const row = findRow(sh, String(id));
   if (row && (String(sh.getRange(row, 7).getValue()) || ADMIN) !== me) throw appError("invalid", "只能修改自己的紀錄");
   return row;
@@ -286,7 +286,7 @@ function readCfg(ss) {
 // 每位實驗者只改自己的定課；邱子芸也可以代改
 function saveMenu(ss, p, me) {
   const who = p.person;
-  if (PEOPLE.indexOf(who) < 0) throw appError("invalid", "找不到這位實驗者");
+  if (PEOPLE.indexOf(who) < 0) throw appError("invalid", "找不到這位驅魔勇士");
   if (me !== who && me !== ADMIN) throw appError("invalid", "只能修改自己的定課");
   const cfg = readCfg(ss);
   if (!cfg) throw appError("invalid", "請先設定實驗期間");

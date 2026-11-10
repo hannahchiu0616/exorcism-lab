@@ -189,7 +189,7 @@ textarea.short { min-height: 76px; }
   <div class="wrap" role="tablist">
     <button class="tab" role="tab" id="tab-checkin" data-view="checkin" type="button">每日打卡</button>
     <button class="tab" role="tab" id="tab-overview" data-view="overview" type="button">打卡紀錄</button>
-    <button class="tab" role="tab" id="tab-journal" data-view="journal" type="button">實驗者心路歷程</button>
+    <button class="tab" role="tab" id="tab-journal" data-view="journal" type="button">驅魔勇士心路歷程</button>
     <button class="tab" role="tab" id="tab-notes" data-view="notes" type="button">驅魔師留言板</button>
     <button class="tab" role="tab" id="tab-rules" data-view="rules" type="button">規則</button>
   </div>
@@ -208,7 +208,7 @@ textarea.short { min-height: 76px; }
     <button class="primary" type="submit">登入</button>
   </form>
   <p class="who" id="who-bar" hidden><span id="who-name"></span><button class="link" id="logout" type="button">登出</button></p>
-  <div class="people" id="people" role="group" aria-label="實驗者"></div>
+  <div class="people" id="people" role="group" aria-label="驅魔勇士"></div>
 
   <section class="panel" id="view-checkin" role="tabpanel" aria-labelledby="tab-checkin">
     <p class="notice">打卡截止日為隔天中午12點</p>
@@ -249,7 +249,7 @@ textarea.short { min-height: 76px; }
   </section>
 
   <section class="panel" id="view-journal" role="tabpanel" aria-labelledby="tab-journal" hidden>
-    <p class="muted" id="journal-observer" hidden>心路歷程只有實驗者本人能看。</p>
+    <p class="muted" id="journal-observer" hidden>心路歷程只有驅魔勇士本人能看。</p>
     <form id="journal-form">
       <h2 id="journal-heading">寫下今天的觀察</h2>
       <label class="field">日期<input type="date" id="journal-date" required></label>
@@ -295,7 +295,7 @@ textarea.short { min-height: 76px; }
     </div>
     <div class="group">
       <h2>休息日</h2>
-      <div class="people" id="rest-people" role="group" aria-label="休息日的實驗者"></div>
+      <div class="people" id="rest-people" role="group" aria-label="休息日的驅魔勇士"></div>
       <p class="muted">國定假日或其他要休息的日子加在這裡，這天不列入打卡和完成率。</p>
       <ul class="edit-list" id="rest-list"></ul>
       <form id="rest-form">
@@ -338,12 +338,12 @@ textarea.short { min-height: 76px; }
         </form>
       </div>
       <div id="people-group" class="group">
-      <h2>實驗者</h2>
-      <p class="muted">新加入的實驗者從加入當天開始算，之前的日子不列入打卡和完成率。已經有打卡紀錄的實驗者不能移除。</p>
+      <h2>驅魔勇士</h2>
+      <p class="muted">新加入的驅魔勇士從加入當天開始算，之前的日子不列入打卡和完成率。已經有打卡紀錄的驅魔勇士不能移除。</p>
       <ul class="edit-list" id="people-list"></ul>
       <form id="people-form">
-        <label class="field">實驗者姓名<input type="text" id="people-name" maxlength="20" required></label>
-        <button class="primary" type="submit">加入實驗者</button>
+        <label class="field">驅魔勇士姓名<input type="text" id="people-name" maxlength="20" required></label>
+        <button class="primary" type="submit">加入驅魔勇士</button>
       </form>
       </div>
       <div id="observer-group" class="group">
@@ -357,7 +357,7 @@ textarea.short { min-height: 76px; }
     </div>
     <div class="group">
       <h2>定課菜單</h2>
-      <div class="people" id="menu-people" role="group" aria-label="定課菜單的實驗者"></div>
+      <div class="people" id="menu-people" role="group" aria-label="定課菜單的驅魔勇士"></div>
       <p class="muted" id="menu-hint"></p>
       <ul class="edit-list" id="edit-list"></ul>
       <form id="add-form">
@@ -613,7 +613,7 @@ textarea.short { min-height: 76px; }
   function renderObservers() {
     $("people-list").replaceChildren(...peopleList().map((p, i) => h("li", null,
       h("span", null, p.name, i === 0 ? h("span", { class: "muted" }, "（管理者）") : p.joined ? h("span", { class: "muted" }, `（${prettyDate(p.joined)}加入）`) : null),
-      i > 0 && !Object.keys(S.checkinsBy[p.name] || {}).length ? deleteButton("移除", () => savePeople(peopleList().filter((x) => x.name !== p.name), `已移除實驗者 ${p.name}`)) : null)));
+      i > 0 && !Object.keys(S.checkinsBy[p.name] || {}).length ? deleteButton("移除", () => savePeople(peopleList().filter((x) => x.name !== p.name), `已移除驅魔勇士 ${p.name}`)) : null)));
     const list = observers();
     $("observer-list").replaceChildren(...list.map((n) => h("li", null, h("span", null, n),
       list.length > 1 ? deleteButton("移除", () => setObservers(list.filter((x) => x !== n), "已移除驅魔師")) : null)));
@@ -640,7 +640,7 @@ textarea.short { min-height: 76px; }
     $("login-form").hidden = !gated || !!S.me;
     $("who-bar").hidden = !gated || !S.me;
     $("who-name").textContent = `已登入：${S.me}`;
-    $("login-hint").textContent = S.view === "journal" ? "心路歷程只有本人能寫和看，請先登入。" : S.view === "notes" ? "留言板只有驅魔師能看，請先登入。" : "規則大家都可以看，邱子芸登入後可以修改；定課菜單由實驗者本人登入後選。";
+    $("login-hint").textContent = S.view === "journal" ? "心路歷程只有本人能寫和看，請先登入。" : S.view === "notes" ? "留言板只有驅魔師能看，請先登入。" : "規則大家都可以看，邱子芸登入後可以修改；定課菜單由驅魔勇士本人登入後選。";
     bar.hidden = S.view === "rules" || S.view === "journal" || (S.view === "notes" && !isObserver());
     bar.replaceChildren(...buttons());
     $("rest-people").replaceChildren(...buttons());
@@ -1054,10 +1054,10 @@ textarea.short { min-height: 76px; }
     e.preventDefault();
     const name = $("people-name").value.trim();
     if (!name) return;
-    if (PEOPLE.includes(name)) { toast("這位實驗者已經在清單裡。"); return; }
+    if (PEOPLE.includes(name)) { toast("這位驅魔勇士已經在清單裡。"); return; }
     if (observers().includes(name)) { toast("這個名字已經是驅魔師，請換一個名字。"); return; }
     $("people-name").value = "";
-    savePeople([...peopleList(), { name, joined: started() ? today() : null }], `已加入實驗者 ${name}，請他登入後設定密碼並選定課菜單`);
+    savePeople([...peopleList(), { name, joined: started() ? today() : null }], `已加入驅魔勇士 ${name}，請他登入後設定密碼並選定課菜單`);
   });
   $("observer-form").addEventListener("submit", (e) => {
     e.preventDefault();
@@ -1065,7 +1065,7 @@ textarea.short { min-height: 76px; }
     if (!name) return;
     $("observer-name").value = "";
     if (observers().includes(name)) { toast("這位驅魔師已經在清單裡。"); return; }
-    if (PEOPLE.includes(name)) { toast("這個名字已經是實驗者。"); return; }
+    if (PEOPLE.includes(name)) { toast("這個名字已經是驅魔勇士。"); return; }
     setObservers([...observers(), name], "已加入驅魔師");
   });
   $("add-form").addEventListener("submit", (e) => {
