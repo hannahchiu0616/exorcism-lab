@@ -52,8 +52,8 @@ button { cursor: pointer; }
 .login { display: grid; gap: 12px; margin: 14px 0 0; }
 .who { display: flex; justify-content: flex-end; align-items: center; gap: 12px; margin: 14px 0 0; font-size: 14px; color: var(--muted); }
 .readonly form:not(#my-pass-form, #add-form), .readonly .edit-list:not(#edit-list) li > button { display: none; }
-.people { display: flex; gap: 8px; margin: 14px 0 0; }
-.people button { flex: 1 1 0; max-width: 160px; padding: 9px 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 4px; font-weight: 500; color: var(--muted); }
+.people { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 0; }
+.people button { flex: 1 1 5.5em; max-width: 160px; white-space: nowrap; padding: 9px 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 4px; font-weight: 500; color: var(--muted); }
 .people button[aria-pressed="true"] { background: var(--talisman); color: var(--on-talisman); border-color: transparent; font-weight: 700; }
 .tabs .wrap { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; }
 .tabs .wrap::-webkit-scrollbar { display: none; }
@@ -73,6 +73,7 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 
 .icon-btn { width: 44px; height: 44px; flex: none; background: var(--surface); border: 1px solid var(--line); border-radius: 4px; font-size: 20px; line-height: 1; }
 .icon-btn:disabled { opacity: .35; cursor: default; }
+.notice { margin: 0 0 16px; padding: 10px 14px; background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--cinnabar); border-radius: 4px; font-size: 14px; }
 .link { background: none; border: 0; padding: 0; color: var(--cinnabar); font-size: 14px; text-decoration: underline; text-underline-offset: 3px; }
 
 .pracs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 8px; }
@@ -210,6 +211,7 @@ textarea.short { min-height: 76px; }
   <div class="people" id="people" role="group" aria-label="實驗者"></div>
 
   <section class="panel" id="view-checkin" role="tabpanel" aria-labelledby="tab-checkin">
+    <p class="notice">打卡截止日為隔天中午12點</p>
     <div class="group" id="check-controls" hidden>
       <div class="datebar">
         <button class="icon-btn" id="prev-day" type="button" aria-label="前一天">‹</button>
