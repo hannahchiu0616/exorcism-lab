@@ -1,6 +1,7 @@
 // 驅魔實驗室 2 後端
 // 資料存在部署者自己 Google 雲端硬碟裡的一份試算表（和原本的實驗室分開）。打卡等內容公開；心路歷程和修改規則要用姓名和密碼登入。
-// 邱子芸在原本的驅魔實驗室打卡；她的打卡、定課菜單和休息日每次讀取時從原本的實驗室同步過來，在這裡只能看不能改。
+// 邱子芸在原本的驅魔實驗室打卡；她的打卡每次讀取時從原本的實驗室同步過來（依定課名稱對應），在這裡只能看不能改。
+// 她的定課菜單和休息日在這裡另外設定，不跟原本的實驗室同步。
 // 安裝：
 //   1. 到 script.google.com 建立新專案，貼上這整段，存檔
 //   2. 上方函式選 setup → 執行 → 授權
@@ -89,34 +90,27 @@ function setup() {
 // 讀原本實驗室的公開資料（不用登入）；結果快取 1 分鐘，連不上時用 6 小時內最後一次成功的結果
 function mirror(fresh) {
   const cache = CacheService.getScriptCache();
-  const hit = !fresh && cache.get("mirror");
+  const hit = !fresh && cache.get("mirror2");
   if (hit) return parse(hit, null);
   try {
     const res = UrlFetchApp.fetch(SOURCE_API, { method: "post", contentType: "text/plain", payload: JSON.stringify({ action: "getAll" }), muteHttpExceptions: true, followRedirects: true });
     const d = JSON.parse(res.getContentText());
     if (!d.ok) throw new Error(d.error || "讀取失敗");
-    const src = d.data || {}, cfg = src.cfg || {}, r = cfg.rules || {};
-    const checkins = {};
-    const raw = (src.checkinsBy || {})[MIRROR] || {};
+    const src = d.data || {}, cfg = src.cfg || {};
+    const names = {};
+    (cfg.practices || []).forEach(p => { names[p.id] = String(p.name || "").trim(); });
+    // 每天打卡完成的定課，記成定課名稱
+    const checkins = {}, raw = (src.checkinsBy || {})[MIRROR] || {};
     Object.keys(raw).forEach(date => {
-      const done = {};
-      Object.keys((raw[date] && raw[date].done) || {}).forEach(id => { if (raw[date].done[id]) done["m:" + id] = true; });
-      checkins[date] = { done: done };
+      const done = (raw[date] && raw[date].done) || {};
+      checkins[date] = Object.keys(done).filter(id => done[id] && names[id]).map(id => names[id]);
     });
-    const m = {
-      at: Date.now(),
-      practices: (cfg.practices || []).map(p => ({ p: p, by: (p.by || {})[MIRROR] || { from: null, to: null } }))
-        .filter(x => x.by.to !== NEVER)
-        .map(x => ({ id: "m:" + x.p.id, name: x.p.name, note: x.p.note || "", addedOn: x.p.addedOn || null, removedOn: x.p.removedOn || null, by: x.by, mirror: true })),
-      checkins: checkins,
-      restDays: Array.isArray(r.restDays) ? r.restDays : [],
-      restReasons: r.restReasons || {},
-    };
+    const m = { at: Date.now(), checkins: checkins };
     const s = JSON.stringify(m);
-    try { cache.put("mirror", s, 60); cache.put("mirrorLast", s, 21600); } catch (e) { /* 太大就不快取 */ }
+    try { cache.put("mirror2", s, 60); cache.put("mirrorLast2", s, 21600); } catch (e) { /* 太大就不快取 */ }
     return m;
   } catch (e) {
-    const last = parse(cache.get("mirrorLast"), null);
+    const last = parse(cache.get("mirrorLast2"), null);
     if (last) last.stale = true;
     return last;
   }
@@ -186,17 +180,15 @@ function snapshot(ss, me) {
     (by[who] = by[who] || {})[r[0]] = { done: parse(r[1], {}) };
   });
   const cfg = parse(settings["實驗"], null) || defaultCfg();
-  // 邱子芸的資料換成原本實驗室的版本：這裡的定課她都不做，改看原本實驗室的定課
-  const m = mirror();
-  by[MIRROR] = m ? m.checkins : {};
-  if (cfg) {
-    const others = PEOPLE.filter(n => n !== MIRROR);
-    cfg.practices = (cfg.practices || []).map(p => { p.by = p.by || {}; p.by[MIRROR] = { from: null, to: NEVER }; return p; })
-      .concat(m ? m.practices.map(p => { const b = {}; b[MIRROR] = p.by; others.forEach(n => { b[n] = { from: null, to: NEVER }; }); p.by = b; return p; }) : []);
-    cfg.rules = cfg.rules || {};
-    cfg.rules.restDays = m ? m.restDays : [];
-    cfg.rules.restReasons = m ? m.restReasons : {};
-  }
+  // 邱子芸的打卡換成原本實驗室的紀錄：原本那邊打卡的定課，對應到這裡同名的定課
+  const m = mirror(), ids = {};
+  (cfg.practices || []).forEach(p => { const n = String(p.name || "").trim(); (ids[n] = ids[n] || []).push(p.id); });
+  by[MIRROR] = {};
+  Object.keys((m && m.checkins) || {}).forEach(date => {
+    const done = {};
+    m.checkins[date].forEach(n => (ids[n] || []).forEach(id => { done[id] = true; }));
+    by[MIRROR][date] = { done: done };
+  });
   return {
     cfg: cfg,
     checkins: by[ADMIN],
@@ -334,7 +326,6 @@ function defaultCfg() {
 function saveMenu(ss, p, me) {
   const who = p.person;
   if (PEOPLE.indexOf(who) < 0) throw appError("invalid", "找不到這位驅魔勇士");
-  if (who === MIRROR) throw appError("invalid", MIRROR + "的定課菜單跟著原本的驅魔實驗室，請到原本的網站修改");
   if (me !== who && me !== ADMIN) throw appError("invalid", "只能修改自己的定課");
   const cfg = readCfg(ss) || defaultCfg();
   if (p.add) {

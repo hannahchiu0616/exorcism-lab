@@ -351,11 +351,10 @@ textarea.short { min-height: 76px; }
   const VIEWS = ["checkin", "overview", "journal", "rules"];
   /* the experimenter list lives in the config; the first person is the admin and people who joined later count from their join day */
   const DEFAULT_PEOPLE = [{ name: "邱子芸", joined: null }, { name: "姵蓉", joined: null }];
-  /* 邱子芸 checks in at the original lab; the backend copies her check-ins, menu and rest days here, read-only */
+  /* 邱子芸 checks in at the original lab; the backend copies her check-ins here by practice name, read-only. Her menu and rest days are her own here. */
   const MIRROR = "邱子芸";
   const SOURCE_SITE = "https://hannahchiu0616.github.io/exorcism-lab/";
   const isMirror = (who = S.person) => who === MIRROR;
-  const ownSide = (p) => !!p.mirror === isMirror();
   let PEOPLE, JOINED;
   const setPeople = (list) => {
     PEOPLE = list.map((p) => p.name);
@@ -426,7 +425,7 @@ textarea.short { min-height: 76px; }
   const practicesOn = (date) => (S.cfg ? S.cfg.practices : []).filter((p) => applies(p, date));
   /* a day counts as missed once noon of the following day has passed */
   const overdue = (s) => { const [y, m, d] = parts(s); return Date.now() >= new Date(y, m - 1, d + 1, 12).getTime(); };
-  const currentPractices = () => (S.cfg ? S.cfg.practices : []).filter((p) => !p.removedOn && ownSide(p));
+  const currentPractices = () => (S.cfg ? S.cfg.practices : []).filter((p) => !p.removedOn);
   const myPractices = () => (S.cfg ? S.cfg.practices : []).filter((p) => doesNow(p));
   /* before anyone has checked in, a change reaches back to the first day */
   const changeDate = () => (Object.entries(S.checkinsBy).some(([who, c]) => !isMirror(who) && Object.keys(c).length) ? today() : null);
@@ -634,7 +633,7 @@ textarea.short { min-height: 76px; }
     g.replaceChildren();
     if (!S.loaded) { g.append(h("p", { class: "empty" }, "正在讀取打卡紀錄……")); return; }
     if (!myPractices().length) {
-      g.append(h("p", { class: "empty" }, isMirror() ? `${MIRROR}的定課跟著原本的驅魔實驗室，同步後就會出現在這裡。` : `${S.person}還沒有定課。到「規則」分頁選定課。`));
+      g.append(h("p", { class: "empty" }, `${S.person}還沒有定課。到「規則」分頁選定課。`));
       return;
     }
     if (!started()) {
@@ -652,7 +651,7 @@ textarea.short { min-height: 76px; }
     const reason = restReason(sel), list = practicesOn(sel), left = list.filter((p) => !saved[p.id]);
     $("day-label").textContent = `${prettyDate(sel)}　${dayLabel(sel)}　已打卡 ${list.length - left.length} / ${list.length}`;
     const word = isToday ? "今天" : "這天";
-    if (view) g.append(h("p", { class: "notice" }, `${MIRROR}在原本的驅魔實驗室打卡，這裡會自動同步，不能在這裡打卡。`, " ", h("a", { href: SOURCE_SITE }, "到原本的驅魔實驗室")));
+    if (view) g.append(h("p", { class: "notice" }, `${MIRROR}在原本的驅魔實驗室打卡，同名的定課會自動同步過來，不能在這裡打卡。`, " ", h("a", { href: SOURCE_SITE }, "到原本的驅魔實驗室")));
     g.append(closed
       ? h("div", { class: "remain" }, h("b", null, "這天已鎖定"), h("span", null, `${!reason && left.length ? `未打卡：${left.map((p) => p.name).join("、")}。` : ""}超過隔天中午 12 點，只能從後台修改。`))
       : reason
@@ -760,14 +759,12 @@ textarea.short { min-height: 76px; }
     $("weekday-picks").replaceChildren(...picks);
     $("rest-list").replaceChildren(...(own.restDays.length ? [...own.restDays].sort().map((d) => h("li", null,
       h("span", null, prettyDate(d), own.restReasons[d] ? h("span", { class: "pill rest-tag" }, own.restReasons[d]) : null),
-      isMirror() ? null : deleteButton("移除", () => setRest(d, false)))) : [h("li", { class: "muted" }, "目前沒有休息日。")]));
-    $("rest-form").hidden = isMirror();
-    $("rest-hint").textContent = isMirror() ? `${MIRROR}的休息日跟著原本的驅魔實驗室，要改請到原本的網站。` : "國定假日或其他要休息的日子加在這裡，這天不列入打卡和完成率。";
+      deleteButton("移除", () => setRest(d, false)))) : [h("li", { class: "muted" }, "目前沒有休息日。")]));
     const start = $("set-start"), end = $("set-end");
     if (document.activeElement !== start) start.value = S.cfg ? S.cfg.startDate : (start.value || today());
     if (document.activeElement !== end) end.value = S.cfg ? lastDay() : (end.value || addDays(today(), DEFAULT_DAYS - 1));
-    const list = currentPractices(), canMenu = !isMirror() && (S.me === S.person || S.me === PEOPLE[0]);
-    $("menu-hint").textContent = isMirror() ? `${MIRROR}的定課菜單跟著原本的驅魔實驗室同步，要改請到原本的網站。` : canMenu ? `這是${S.person}自己的菜單，切換只影響${S.person}，過去的打卡紀錄會保留。` : `${S.person}登入後可以修改這份菜單。`;
+    const list = currentPractices(), canMenu = S.me === S.person || S.me === PEOPLE[0];
+    $("menu-hint").textContent = isMirror() && canMenu ? `這是${MIRROR}在這間實驗室的菜單。原本的驅魔實驗室裡同名定課的打卡會同步過來，名稱要一模一樣。` : canMenu ? `這是${S.person}自己的菜單，切換只影響${S.person}，過去的打卡紀錄會保留。` : `${S.person}登入後可以修改這份菜單。`;
     $("edit-list").replaceChildren(...(list.length ? list.map((p) => h("li", null,
       h("span", null, p.name, p.note ? `（${p.note}）` : ""),
       h("span", { class: "picks menu-pick" }, h("button", {
