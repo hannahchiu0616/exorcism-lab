@@ -99,6 +99,8 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 .prac.special .prac-text b, .prac.special[aria-checked="true"] .prac-text b { font-family: var(--display); font-weight: 900; font-size: 23px; line-height: 1.35; letter-spacing: .08em; color: var(--title); }
 .prac.special .prac-text small { color: var(--on-talisman); }
 .prac.special .special-tag { margin-bottom: 4px; font-size: 12px; font-weight: 700; letter-spacing: .3em; color: var(--cinnabar); }
+.prac.special.invite { border-style: dashed; box-shadow: none; }
+.prac.special.invite .seal { color: var(--cinnabar); font-family: var(--display); font-weight: 900; font-size: 24px; }
 .prac.special.locked, .prac.special.closed { background: linear-gradient(135deg, var(--talisman-soft), var(--talisman)); color: var(--on-talisman); }
 .special-list { display: grid; gap: 12px; }
 .special-box { display: grid; gap: 10px; padding: 14px 16px; background: var(--talisman-soft); color: var(--on-talisman); border: 1px solid var(--cinnabar); border-radius: 4px; }
@@ -772,7 +774,11 @@ textarea.short { min-height: 76px; }
     };
     /* keep the usual grouping order, then split it evenly so neither column runs long */
     const special = list.filter((p) => p.special), plain = list.filter((p) => !p.special);
-    if (special.length) g.append(h("div", { class: "group" }, special.map(pracButton)));
+    /* without one yet, the same spot invites the person to ask the C circle for it */
+    g.append(h("div", { class: "group" }, special.length ? special.map(pracButton) : h("div", { class: "prac special invite" },
+      h("span", { class: "seal", "aria-hidden": "true" }, "訂"),
+      h("span", { class: "prac-text" }, h("small", { class: "special-tag" }, "✦ 驅魔師C圈訂制 ✦"), h("b", null, "專屬定課・虛位以待"),
+        h("small", null, `${S.person}，你還沒有專屬定課，快去找驅魔師為你量身訂製一項吧！`)))));
     const ordered = [...plain.filter((p) => LEFT_PRACTICES.test(p.name)), ...plain.filter((p) => !LEFT_PRACTICES.test(p.name))];
     const rows = Math.ceil(ordered.length / 2), leftCol = ordered.slice(0, rows), rightCol = ordered.slice(rows);
     const column = (items) => h("div", { class: "prac-col", style: `--rows: ${rows}` }, items.map(pracButton));
