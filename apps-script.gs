@@ -244,6 +244,7 @@ function cleanCfg(c) {
       id: text(p.id, 40), name: text(p.name, 60), note: String(p.note || "").slice(0, 120),
       addedOn: isDate(p.addedOn) ? p.addedOn : null, removedOn: isDate(p.removedOn) ? p.removedOn : null,
       by: cleanBy(p.by, names),
+      ...(names.indexOf(p.special) >= 0 ? { special: p.special } : {}), // 驅魔師C圈為這個人專屬打造的定課
     })),
   };
 }
@@ -256,7 +257,7 @@ function cleanDone(d) {
 /* ---------- 網址入口 ---------- */
 function out(obj) { return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON); }
 
-const VERSION = "2026-11-10 公佈欄"; // 打開網頁應用程式網址就看得到，用來確認部署的是哪一版
+const VERSION = "2026-11-12 專屬定課"; // 打開網頁應用程式網址就看得到，用來確認部署的是哪一版
 function doGet() { return out({ ok: true, service: "exorcism-lab", version: VERSION }); }
 
 function doPost(e) {
@@ -307,7 +308,20 @@ function saveMenu(ss, p, me) {
   if (me !== who && me !== ADMIN) throw appError("invalid", "只能修改自己的定課");
   const cfg = readCfg(ss);
   if (!cfg) throw appError("invalid", "請先設定實驗期間");
-  if (p.add) {
+  if (p.special || p.specialRemove) {
+    // 專屬定課（驅魔師C圈訂制）只有邱子芸能設定，每人一項
+    if (me !== ADMIN) throw appError("invalid", "只有邱子芸可以設定專屬定課");
+    const cur = cfg.practices.filter(x => x.special === who && !x.removedOn)[0];
+    if (p.specialRemove) {
+      if (cur) cur.removedOn = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10);
+    } else if (cur) {
+      cur.name = p.special.name; cur.note = p.special.note;
+    } else {
+      const by = {};
+      PEOPLE.filter(n => n !== who).forEach(n => { by[n] = { from: null, to: NEVER }; });
+      cfg.practices.push({ id: p.special.id, name: p.special.name, note: p.special.note, addedOn: p.special.addedOn, removedOn: null, by: by, special: who });
+    }
+  } else if (p.add) {
     const by = {};
     PEOPLE.filter(n => n !== who).forEach(n => { by[n] = { from: null, to: NEVER }; });
     cfg.practices.push({ id: p.add.id, name: p.add.name, note: p.add.note, addedOn: p.add.addedOn, removedOn: null, by: by });

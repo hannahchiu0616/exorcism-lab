@@ -90,6 +90,21 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 .prac.locked { background: var(--bg); }
 .prac.closed { background: var(--bg); color: var(--muted); }
 .prac.locked .seal { background: var(--muted); color: var(--bg); }
+/* the one practice the C circle made for this person: a talisman card above the others */
+.prac.special { position: relative; min-height: 112px; padding: 18px 20px; gap: 18px; background: linear-gradient(135deg, var(--talisman-soft), var(--talisman)); color: var(--on-talisman); border: 2px solid var(--cinnabar); box-shadow: inset 0 0 0 4px var(--talisman-soft), inset 0 0 0 5px var(--cinnabar); }
+.prac.special .seal { width: 54px; height: 54px; font-size: 30px; border: 2px dashed var(--cinnabar); border-radius: 50%; }
+.prac.special[aria-checked="true"] .seal { border: 0; }
+.prac.special .prac-text b, .prac.special[aria-checked="true"] .prac-text b { font-family: var(--display); font-weight: 900; font-size: 23px; line-height: 1.35; letter-spacing: .08em; color: var(--title); }
+.prac.special .prac-text small { color: var(--on-talisman); }
+.prac.special .special-tag { margin-bottom: 4px; font-size: 12px; font-weight: 700; letter-spacing: .3em; color: var(--cinnabar); }
+.prac.special.locked, .prac.special.closed { background: linear-gradient(135deg, var(--talisman-soft), var(--talisman)); color: var(--on-talisman); }
+.special-list { display: grid; gap: 12px; }
+.special-box { display: grid; gap: 10px; padding: 14px 16px; background: var(--talisman-soft); color: var(--on-talisman); border: 1px solid var(--cinnabar); border-radius: 4px; }
+.special-box h3 { margin: 0; font-size: 16px; color: var(--ink); }
+.special-box .two { align-items: end; }
+.special-box .special-name { margin: 0; overflow-wrap: anywhere; font-family: var(--display); font-weight: 900; font-size: 20px; color: var(--title); }
+.special-box .muted, .special-box .field { color: var(--on-talisman); }
+@media (max-width: 559px) { .prac.special { padding: 14px; gap: 12px; } .prac.special .seal { width: 44px; height: 44px; font-size: 26px; } .prac.special .prac-text b { font-size: 20px; } }
 .stamp .seal { animation: stamp .24s ease-out; }
 @keyframes stamp { from { transform: scale(1.7); opacity: .3; } to { transform: scale(1); opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .stamp .seal { animation: none; } }
@@ -363,6 +378,11 @@ textarea.short { min-height: 76px; }
       </form>
       </div>
     </div>
+    <div class="group" id="special-group">
+      <h2>✦ 驅魔師C圈訂制・專屬定課 ✦</h2>
+      <p class="muted">驅魔師C圈為每位驅魔勇士專屬打造一項定課，會隆重地出現在他打卡頁的最上面。每個人的都不一樣，只有邱子芸能寫。</p>
+      <div class="special-list" id="special-list"></div>
+    </div>
     <div class="group">
       <h2>定課菜單</h2>
       <div class="people" id="menu-people" role="group" aria-label="定課菜單的驅魔勇士"></div>
@@ -436,6 +456,8 @@ textarea.short { min-height: 76px; }
   /* p.by[name] = { from, to } narrows a practice for one person; no entry means the shared addedOn / removedOn apply */
   const NEVER = "2000-01-01";
   const byOf = (p, who) => (p.by && p.by[who]) || {};
+  /* each person may have one practice the C circle made just for them; it lives outside the shared menu */
+  const specialOf = (who = S.person) => (S.cfg ? S.cfg.practices : []).find((p) => p.special === who && !p.removedOn) || null;
   const applies = (p, date, who = S.person) => {
     const o = byOf(p, who), from = [o.from || p.addedOn, JOINED[who]].filter(Boolean).sort().pop();
     return (!from || date >= from) && (!p.removedOn || date < p.removedOn) && (!o.to || date < o.to);
@@ -456,7 +478,7 @@ textarea.short { min-height: 76px; }
   const practicesOn = (date) => (S.cfg ? S.cfg.practices : []).filter((p) => applies(p, date));
   /* a day counts as missed once noon of the following day has passed */
   const overdue = (s) => { const [y, m, d] = parts(s); return Date.now() >= new Date(y, m - 1, d + 1, 12).getTime(); };
-  const currentPractices = () => (S.cfg ? S.cfg.practices : []).filter((p) => !p.removedOn);
+  const currentPractices = () => (S.cfg ? S.cfg.practices : []).filter((p) => !p.removedOn && !p.special);
   const myPractices = () => (S.cfg ? S.cfg.practices : []).filter((p) => doesNow(p));
   /* before anyone has checked in, a change reaches back to the first day */
   const changeDate = () => (Object.values(S.checkinsBy).some((c) => Object.keys(c).length) ? today() : null);
@@ -731,15 +753,17 @@ textarea.short { min-height: 76px; }
     const pracButton = (p) => {
       const locked = !!saved[p.id], isDone = !!picked[p.id];
       return h("button", {
-        class: "prac" + (locked ? " locked" : closed ? " closed" : S.justStamped === p.id && isDone ? " stamp" : ""),
+        class: "prac" + (p.special ? " special" : "") + (locked ? " locked" : closed ? " closed" : S.justStamped === p.id && isDone ? " stamp" : ""),
         type: "button", role: "checkbox", "aria-checked": String(isDone), "data-pid": p.id,
         disabled: locked || closed, on: { click: () => toggle(p.id) },
       },
         h("span", { class: "seal", "aria-hidden": "true" }, "✓"),
-        h("span", { class: "prac-text" }, h("b", null, p.name), p.note ? h("small", null, p.note) : null, locked ? h("small", null, "已打卡") : null));
+        h("span", { class: "prac-text" }, p.special ? h("small", { class: "special-tag" }, "✦ 驅魔師C圈訂制 ✦") : null, h("b", null, p.name), p.note ? h("small", null, p.note) : null, locked ? h("small", null, "已打卡") : null));
     };
     /* keep the usual grouping order, then split it evenly so neither column runs long */
-    const ordered = [...list.filter((p) => LEFT_PRACTICES.test(p.name)), ...list.filter((p) => !LEFT_PRACTICES.test(p.name))];
+    const special = list.filter((p) => p.special), plain = list.filter((p) => !p.special);
+    if (special.length) g.append(h("div", { class: "group" }, special.map(pracButton)));
+    const ordered = [...plain.filter((p) => LEFT_PRACTICES.test(p.name)), ...plain.filter((p) => !LEFT_PRACTICES.test(p.name))];
     const rows = Math.ceil(ordered.length / 2), leftCol = ordered.slice(0, rows), rightCol = ordered.slice(rows);
     const column = (items) => h("div", { class: "prac-col", style: `--rows: ${rows}` }, items.map(pracButton));
     g.append(h("div", { class: "pracs" }, column(leftCol), column(rightCol)));
@@ -806,7 +830,7 @@ textarea.short { min-height: 76px; }
       const n = due.filter((d) => doneMap(d)[p.id]).length;
       const bonus = dates.filter((d) => restReason(d) && applies(p, d) && doneMap(d)[p.id]).length;
       return h("tr", null,
-        h("th", { class: "name", scope: "row" }, p.name + (doesNow(p) ? "" : "（已移除）"), h("small", null, `${n} / ${due.length} 天` + (bonus ? `，休息日 +${bonus}` : ""))),
+        h("th", { class: "name", scope: "row" }, (p.special ? "✦ " : "") + p.name + (doesNow(p) ? "" : "（已移除）"), h("small", null, `${n} / ${due.length} 天` + (bonus ? `，休息日 +${bonus}` : ""))),
         week.map((d) => {
           if (d < S.cfg.startDate || d > lastDay() || !applies(p, d)) return h("td", null, "");
           if (doneMap(d)[p.id]) return h("td", { class: restReason(d) ? "off" : null }, h("span", { class: "mark" }, "✓"));
@@ -840,10 +864,43 @@ textarea.short { min-height: 76px; }
       }, doesNow(p) ? "要做" : "不做")),
       canMenu && PEOPLE.every((who) => !doesNow(p, who)) ? deleteButton("移除", () => removePractice(p.id)) : null)) : [h("li", { class: "muted" }, "清單是空的，用下方表單加入。")]));
     $("add-form").hidden = !canMenu;
+    renderSpecial();
     $("add-submit").textContent = `加入${S.person}的定課`;
     const admin = S.me === PEOPLE[0], panel = $("view-rules");
     panel.classList.toggle("readonly", !admin);
     for (const el of panel.querySelectorAll("input:not(#my-pass, #add-form input), textarea, select, .picks:not(.menu-pick) button")) el.disabled = !admin;
+  }
+  function renderSpecial() {
+    const admin = S.me === PEOPLE[0], list = $("special-list");
+    const key = JSON.stringify([admin, PEOPLE, PEOPLE.map((n) => specialOf(n))]);
+    /* rebuild only when something changed, so text being typed is never wiped by a poll */
+    if (list.dataset.key === key || list.contains(document.activeElement)) return;
+    list.dataset.key = key;
+    list.replaceChildren(...PEOPLE.map((who) => {
+      const sp = specialOf(who);
+      const nameIn = h("input", { type: "text", maxlength: "60", required: true, value: sp ? sp.name : "", "aria-label": `${who}的專屬定課名稱` });
+      const noteIn = h("input", { type: "text", maxlength: "120", value: sp ? sp.note || "" : "", "aria-label": `${who}的專屬定課說明` });
+      const form = h("form", { on: { submit: (e) => {
+        e.preventDefault();
+        const name = nameIn.value.trim(), note = noteIn.value.trim();
+        if (!name) return;
+        if (!S.loaded) { toast("資料還在讀取中，請稍等幾秒再試。"); return; }
+        const cur = specialOf(who);
+        if (cur && cur.name === name && (cur.note || "") === note) { toast("沒有變更。"); return; }
+        const special = cur ? { name, note } : { id: "s" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name, note, addedOn: started() ? today() : null };
+        saveSpecial(who, { special }, cur ? `已更新${who}的專屬定課` : `已為${who}打造專屬定課「${name}」`);
+      } } },
+        h("div", { class: "two" },
+          h("label", { class: "field" }, "專屬定課名稱", nameIn),
+          h("label", { class: "field" }, "說明（選填）", noteIn)),
+        h("div", { class: "actions" },
+          h("button", { class: "primary", type: "submit" }, sp ? "更新" : "打造專屬定課"),
+          sp ? deleteButton("移除", () => saveSpecial(who, { specialRemove: true }, `已移除${who}的專屬定課，過去的打卡紀錄會保留`)) : null));
+      return h("div", { class: "special-box" },
+        h("h3", null, who),
+        admin ? null : h("p", { class: sp ? "special-name" : "muted" }, sp ? sp.name + (sp.note ? `（${sp.note}）` : "") : "還沒有專屬定課。"),
+        admin ? form : null);
+    }));
   }
   function renderJournal() {
     const dateInput = $("journal-date");
@@ -992,6 +1049,19 @@ textarea.short { min-height: 76px; }
     const entry = !on ? { from, to: changeDate() || NEVER } : cur.to === today() ? { from, to: null } : { from: changeDate(), to: null };
     p.by = { ...p.by, [who]: entry };
     saveMenu(next, { id: pid, entry }, on ? `已加入${who}的定課` : `已從${who}的定課移除，過去的打卡紀錄會保留`);
+  }
+  function saveSpecial(who, body, msg) {
+    const next = baseCfg(), sp = specialOf(who), t = today();
+    if (body.specialRemove) next.practices = next.practices.map((p) => (sp && p.id === sp.id ? { ...p, removedOn: t } : p));
+    else if (sp) next.practices = next.practices.map((p) => (p.id === sp.id ? { ...p, name: body.special.name, note: body.special.note } : p));
+    else next.practices.push({ ...body.special, removedOn: null, special: who, by: Object.fromEntries(PEOPLE.filter((n) => n !== who).map((n) => [n, { from: null, to: NEVER }])) });
+    lastRaw = ""; /* an old backend echoes the same data back, which must still undo the optimistic change */
+    S.cfg = next; render();
+    write("saveMenu", { person: who, ...body }).then((ok) => {
+      if (!ok) return;
+      const stored = body.specialRemove || (S.cfg && S.cfg.practices.some((p) => p.special === who && !p.removedOn));
+      toast(stored ? msg : "沒有存到，請先更新 Google 後端。");
+    });
   }
   function removePractice(pid) {
     const next = baseCfg(), t = today();
