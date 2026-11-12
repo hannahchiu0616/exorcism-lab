@@ -777,8 +777,8 @@ textarea.short { min-height: 76px; }
     /* without one yet, the same spot invites the person to ask the C circle for it */
     g.append(h("div", { class: "group" }, special.length ? special.map(pracButton) : h("div", { class: "prac special invite" },
       h("span", { class: "seal", "aria-hidden": "true" }, "訂"),
-      h("span", { class: "prac-text" }, h("small", { class: "special-tag" }, "✦ 驅魔師C圈訂制 ✦"), h("b", null, "專屬定課・虛位以待"),
-        h("small", null, `${S.person}，你還沒有專屬定課，快去找驅魔師為你量身訂製一項吧！`)))));
+      h("span", { class: "prac-text" }, h("small", { class: "special-tag" }, "✦ 驅魔師C圈訂制 ✦"), h("b", null, "驅魔大絕招 專屬定課"),
+        h("small", null, "快來開箱 找驅魔師為你量身訂製吧！")))));
     const ordered = [...plain.filter((p) => LEFT_PRACTICES.test(p.name)), ...plain.filter((p) => !LEFT_PRACTICES.test(p.name))];
     const rows = Math.ceil(ordered.length / 2), leftCol = ordered.slice(0, rows), rightCol = ordered.slice(rows);
     const column = (items) => h("div", { class: "prac-col", style: `--rows: ${rows}` }, items.map(pracButton));
