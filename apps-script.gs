@@ -95,6 +95,7 @@ function book() {
   const id = props().getProperty("sheetId");
   if (!id) throw appError("not_setup", "後端還沒安裝，請先執行 setup");
   const ss = SpreadsheetApp.openById(id);
+  ROWS = {};
   PEOPLE = cleanPeople((readCfg(ss) || {}).people).map(p => p.name);
   return ss;
 }
@@ -113,12 +114,15 @@ function tab(ss, name) {
   }
   return sh;
 }
+// 同一次請求裡每個分頁只讀一次；寫入之後由 doPost 清掉重讀
+let ROWS = {};
 function rows(ss, name) {
-  const sh = tab(ss, name), n = sh.getLastRow();
-  if (n < 2) return [];
-  return sh.getRange(2, 1, n - 1, TABS[name].length).getValues()
-    .map(r => r.map(x => String(x)))
+  if (ROWS[name]) return ROWS[name];
+  const all = tab(ss, name).getDataRange().getValues(), width = TABS[name].length;
+  ROWS[name] = all.slice(1)
+    .map(r => { const out = []; for (let i = 0; i < width; i++) out.push(r[i] == null ? "" : String(r[i])); return out; })
     .filter(r => r[0].trim());
+  return ROWS[name];
 }
 function findRow(sh, key) {
   const n = sh.getLastRow();
@@ -257,7 +261,7 @@ function cleanDone(d) {
 /* ---------- 網址入口 ---------- */
 function out(obj) { return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON); }
 
-const VERSION = "2026-11-12 專屬定課"; // 打開網頁應用程式網址就看得到，用來確認部署的是哪一版
+const VERSION = "2026-11-12 加快讀取"; // 打開網頁應用程式網址就看得到，用來確認部署的是哪一版
 function doGet() { return out({ ok: true, service: "exorcism-lab", version: VERSION }); }
 
 function doPost(e) {
@@ -279,6 +283,7 @@ function doPost(e) {
         return out({ ok: true, session: makeSession(name), data: snapshot(ss, name) });
       }
       applyWrite(ss, p, whoIs(ss, p.auth));
+      ROWS = {};
       SpreadsheetApp.flush();
       return out({ ok: true, data: snapshot(ss, whoIs(ss, p.auth)) });
     } finally {

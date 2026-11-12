@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex">
 <title>驅魔實驗室 2</title>
+<link rel="preconnect" href="https://script.google.com">
+<link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=LXGW+WenKai+TC&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@900&display=swap">
@@ -496,14 +498,20 @@ textarea.short { min-height: 76px; }
     return d;
   }
   let lastRaw = "";
-  function applyData(data) {
+  /* the last data from the backend is kept on this device so the page can show it at once while the backend wakes up */
+  const CACHE_KEY = "lab2:lastData";
+  function applyData(data, cached) {
     const raw = JSON.stringify(data);
+    if (!cached) {
+      S.synced = true;
+      try { localStorage.setItem(CACHE_KEY, raw); } catch (e) { /* showing it early is optional */ }
+    }
     if (raw === lastRaw && S.loaded) return;
     lastRaw = raw;
     S.cfg = data.cfg || null;
     if (S.cfg && !Array.isArray(S.cfg.practices)) S.cfg.practices = [];
     S.multi = !!data.checkinsBy;
-    if (S.multi && S.auth && data.me !== S.auth.name) { setAuth(null); toast("登入已失效，請重新登入。"); }
+    if (!cached && S.multi && S.auth && data.me !== S.auth.name) { setAuth(null); toast("登入已失效，請重新登入。"); }
     S.hasPassword = data.hasPassword || [];
     S.checkinsBy = data.checkinsBy || { [PEOPLE[0]]: data.checkins || {} };
     syncPeople();
@@ -514,6 +522,8 @@ textarea.short { min-height: 76px; }
   /* writes run one at a time; a poll that started before a write is discarded */
   let queue = Promise.resolve(), writes = 0, inFlight = 0, refreshing = false;
   function write(action, body) {
+    /* never write on top of the copy kept on this device: it may be behind what others saved */
+    if (!S.synced) { lastRaw = ""; toast("正在同步最新資料，請稍等幾秒再試。"); return Promise.resolve(false); }
     writes++; inFlight++;
     const run = queue.then(() => call(action, body));
     queue = run.catch(() => {});
@@ -549,7 +559,7 @@ textarea.short { min-height: 76px; }
   const sheetSafe = (s) => (/^[=']/.test(s) ? "'" + s : s);
   function saveCfg(next) {
     /* never save before the stored settings have loaded: baseCfg would fall back to blank defaults and overwrite them */
-    if (!S.loaded) { toast("資料還在讀取中，請稍等幾秒再試。"); return Promise.resolve(false); }
+    if (!S.loaded || !S.synced) { toast("資料還在讀取中，請稍等幾秒再試。"); return Promise.resolve(false); }
     S.cfg = next; render();
     return write("saveConfig", { cfg: next });
   }
@@ -971,6 +981,7 @@ textarea.short { min-height: 76px; }
     }
   });
   $("logout").addEventListener("click", () => {
+    try { localStorage.removeItem(CACHE_KEY); } catch (e) { /* nothing kept */ }
     setAuth(null); S.journal = []; S.hasPassword = []; lastRaw = ""; writes++;
     if (S.editing) resetJournal();
     render(); refresh();
@@ -1044,6 +1055,7 @@ textarea.short { min-height: 76px; }
   if (!API) {
     setBanner("網站的資料後端還沒接上。");
   } else {
+    try { const saved = JSON.parse(localStorage.getItem(CACHE_KEY)); if (saved && saved.cfg !== undefined) applyData(saved, true); } catch (e) { /* start from the loading state */ }
     refresh();
     setInterval(refresh, POLL_MS);
   }
