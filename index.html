@@ -712,6 +712,8 @@ textarea.short { min-height: 76px; }
   function renderBoard() {
     const next = nextPublish(), mine = PEOPLE.includes(S.me);
     const vow = $("vow"), mustVow = S.view === "board" && !!S.me && vowDue() && !S.vowed;
+    /* warriors vow to take the advice in; everyone else vows to see themselves in it */
+    $("vow-text").textContent = mine ? "我是一個領受力很好的人，我相信我會將留言板的批評和讚美化為驅魔成長的動力" : "我是一個很有覺察的人，我相信我會從別人的留言板中覺察到自己，收穫滿滿";
     if (mustVow && !vow.open) vow.showModal();
     $("board-list").hidden = mustVow;
     $("board-when").textContent = `每月 15 號和 30 號（沒有 30 號的月份在月底）會公布驅魔師留言板的留言。下次公布：${next ? prettyDate(next) : "—"}`;
