@@ -76,6 +76,8 @@ function login(ss, p) {
 }
 // 每則留言只有寫的人看得到，被留言的驅魔勇士看不到
 // 隨緣驅魔師留言板的名字是自己填的，不算任何人的帳號，所以不列在「我的留言」
+// 不開放隨緣驅魔師留言板的驅魔勇士
+const OPEN_EXCLUDED = ["宋有紳"];
 const canSeeNote = (n, me) => !!me && !n.open && n.role === me;
 
 /* ---------- 安裝 ---------- */
@@ -262,7 +264,7 @@ function cleanDone(d) {
 /* ---------- 網址入口 ---------- */
 function out(obj) { return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON); }
 
-const VERSION = "2026-11-17 隨緣留言板"; // 打開網頁應用程式網址就看得到，用來確認部署的是哪一版
+const VERSION = "2026-11-17 隨緣不含有紳"; // 打開網頁應用程式網址就看得到，用來確認部署的是哪一版
 function doGet() { return out({ ok: true, service: "exorcism-lab", version: VERSION }); }
 
 function doPost(e) {
@@ -406,6 +408,7 @@ function applyWrite(ss, p, me) {
         const name = String(p.name == null ? "" : p.name).trim().slice(0, 20);
         if (!name) throw appError("invalid", "請填寫你的名字");
         if (PEOPLE.indexOf(p.person) < 0) throw appError("invalid", "找不到這位驅魔勇士");
+        if (OPEN_EXCLUDED.indexOf(p.person) >= 0) throw appError("invalid", p.person + " 不開放隨緣留言");
         if (p.person === name.replace(/^'/, "")) throw appError("invalid", "不能留言給自己");
         // 防止灌留言：10 分鐘內最多 60 則
         const cache = CacheService.getScriptCache(), count = Number(cache.get("open:recent")) || 0;
