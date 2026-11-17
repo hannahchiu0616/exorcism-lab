@@ -758,7 +758,7 @@ textarea.short { min-height: 76px; }
   }
   function renderPeople() {
     const notes = S.view === "notes", bar = $("people");
-    const buttons = (skip) => PEOPLE.filter((p) => p !== skip).map((p) => h("button", { type: "button", "aria-pressed": String(p === (skip ? noteTo() : S.person)), on: { click: () => pickPerson(p) } }, p));
+    const buttons = (skip) => (S.view === "open" ? openPeople() : PEOPLE).filter((p) => p !== skip).map((p) => h("button", { type: "button", "aria-pressed": String(p === (skip ? noteTo() : S.view === "open" ? openTo() : S.person)), on: { click: () => pickPerson(p) } }, p));
     const gated = S.view === "notes" || S.view === "board" || S.view === "rules" || S.view === "journal";
     const menu = $("login-name"), chosen = menu.value;
     const names = S.view === "journal" ? PEOPLE : S.view === "notes" ? [...observers(), ...PEOPLE] : [...PEOPLE, ...observers()];
@@ -992,8 +992,12 @@ textarea.short { min-height: 76px; }
     empty.hidden = !S.loaded || list.length > 0;
     empty.textContent = "還沒有紀錄。用上方表單寫下第一篇。";
   }
+  /* warriors who do not take notes from the open board */
+  const OPEN_EXCLUDED = ["宋有紳"];
+  const openPeople = () => PEOPLE.filter((p) => !OPEN_EXCLUDED.includes(p));
+  const openTo = () => (openPeople().includes(S.person) ? S.person : openPeople()[0]);
   function renderOpen() {
-    $("open-heading").textContent = `留言給 ${S.person}`;
+    $("open-heading").textContent = `留言給 ${openTo()}`;
     const nameIn = $("open-name");
     if (!nameIn.value && document.activeElement !== nameIn) {
       let saved = "";
@@ -1303,7 +1307,7 @@ textarea.short { min-height: 76px; }
   });
   $("open-form").addEventListener("submit", async (e) => {
     e.preventDefault();
-    const name = $("open-name").value.trim(), body = $("open-body").value.trim(), to = S.person;
+    const name = $("open-name").value.trim(), body = $("open-body").value.trim(), to = openTo();
     if (!name) { toast("請填寫你的名字。"); $("open-name").focus(); return; }
     if (!body) return;
     if (name === to) { toast("不能留言給自己。"); return; }
