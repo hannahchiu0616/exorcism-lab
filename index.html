@@ -742,8 +742,8 @@ textarea.short { min-height: 76px; }
     const empty = $("board-empty"), list = $("board-list");
     if (!S.me || !S.loaded) { list.replaceChildren(); empty.hidden = true; return; }
     if (!S.hasBoard) { list.replaceChildren(); empty.hidden = false; empty.textContent = "公佈欄還沒開啟，請先更新 Google 後端。"; return; }
-    /* my own advice first, then everyone else in the usual order */
-    const order = [...(mine ? [S.me] : []), ...PEOPLE.filter((n) => n !== S.me)];
+    /* the warrior chosen in the bar above; each warrior's notes on their own page */
+    const order = [S.person];
     const groups = order.map((name) => [name, S.board.filter((n) => (n.person || PEOPLE[0]) === name).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))]).filter(([, l]) => l.length);
     list.replaceChildren(...groups.map(([name, l]) => h("div", { class: "group" },
       h("h2", null, name === S.me ? `給我的建議（${l.length}）` : `給 ${name} 的建議（${l.length}）`),
@@ -754,7 +754,7 @@ textarea.short { min-height: 76px; }
           n.createdAt ? h("span", null, stamp(n.createdAt)) : null),
         h("p", { class: "text" }, n.body)))))));
     empty.hidden = groups.length > 0;
-    empty.textContent = "還沒有公布的留言。";
+    empty.textContent = S.person === S.me ? "還沒有公布給你的留言。" : `還沒有公布給 ${S.person} 的留言。`;
   }
   function renderPeople() {
     const notes = S.view === "notes", bar = $("people");
@@ -771,7 +771,7 @@ textarea.short { min-height: 76px; }
     $("guest-bar").hidden = !!S.me || gated || !!S.wantLogin;
     $("who-name").textContent = `已登入：${S.me}`;
     $("login-hint").textContent = !gated ? "登入後可以打卡，也能看心路歷程、驅魔師留言板、公佈欄和規則。" : S.view === "journal" ? "心路歷程只有本人能寫和看，請先登入。" : S.view === "board" ? "公佈欄要先登入才能看。" : S.view === "notes" ? "留言要先登入。留言會在每月 15 號和 30 號公布到公佈欄。" : "規則大家都可以看，邱子芸登入後可以修改；定課菜單由驅魔勇士本人登入後選。";
-    bar.hidden = S.view === "rules" || S.view === "journal" || S.view === "board" || (S.view === "notes" && !S.me);
+    bar.hidden = S.view === "rules" || S.view === "journal" || (S.view === "board" && !S.me) || (S.view === "notes" && !S.me);
     bar.replaceChildren(...buttons(notes ? S.me : null));
     $("rest-people").replaceChildren(...buttons());
     $("menu-people").replaceChildren(...buttons());
