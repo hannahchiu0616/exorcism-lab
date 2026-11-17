@@ -16,7 +16,7 @@ const TABS = {
   "設定": ["項目", "值"],
   "打卡": ["日期", "完成項目", "實驗者"],
   "歷程": ["編號", "日期", "能量", "內容", "建立時間", "修改時間", "實驗者"],
-  "留言": ["編號", "內容", "建立時間", "身分", "實驗者"],
+  "留言": ["編號", "內容", "建立時間", "身分", "實驗者", "來源"],
 };
 
 const props = () => PropertiesService.getScriptProperties();
@@ -75,7 +75,8 @@ function login(ss, p) {
   return makeSession(name);
 }
 // 每則留言只有寫的人看得到，被留言的驅魔勇士看不到
-const canSeeNote = (n, me) => !!me && n.role === me;
+// 隨緣驅魔師留言板的名字是自己填的，不算任何人的帳號，所以不列在「我的留言」
+const canSeeNote = (n, me) => !!me && !n.open && n.role === me;
 
 /* ---------- 安裝 ---------- */
 function setup() {
@@ -173,7 +174,7 @@ function snapshot(ss, me) {
   });
   const cfg = parse(settings["實驗"], null);
   if (cfg) cfg.observers = observers(ss);
-  const allNotes = rows(ss, "留言").map(r => ({ id: r[0], body: r[1], createdAt: Number(r[2]) || 0, role: r[3], person: r[4] || ADMIN }));
+  const allNotes = rows(ss, "留言").map(r => ({ id: r[0], body: r[1], createdAt: Number(r[2]) || 0, role: r[3], person: r[4] || ADMIN, open: r[5] === "隨緣" }));
   const cutoff = lastPublish(Date.now());
   return {
     cfg: cfg,
@@ -261,7 +262,7 @@ function cleanDone(d) {
 /* ---------- 網址入口 ---------- */
 function out(obj) { return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON); }
 
-const VERSION = "2026-11-12 加快讀取"; // 打開網頁應用程式網址就看得到，用來確認部署的是哪一版
+const VERSION = "2026-11-17 隨緣留言板"; // 打開網頁應用程式網址就看得到，用來確認部署的是哪一版
 function doGet() { return out({ ok: true, service: "exorcism-lab", version: VERSION }); }
 
 function doPost(e) {
@@ -400,6 +401,20 @@ function applyWrite(ss, p, me) {
       return;
     }
     case "addNote": {
+      if (p.open) {
+        // 隨緣驅魔師留言板：不用登入，名字自己填
+        const name = String(p.name == null ? "" : p.name).trim().slice(0, 20);
+        if (!name) throw appError("invalid", "請填寫你的名字");
+        if (PEOPLE.indexOf(p.person) < 0) throw appError("invalid", "找不到這位驅魔勇士");
+        if (p.person === name.replace(/^'/, "")) throw appError("invalid", "不能留言給自己");
+        // 防止灌留言：10 分鐘內最多 60 則
+        const cache = CacheService.getScriptCache(), count = Number(cache.get("open:recent")) || 0;
+        if (count >= 60) throw appError("invalid", "留言太頻繁了，請過幾分鐘再試");
+        cache.put("open:recent", String(count + 1), 600);
+        const sh = tab(ss, "留言");
+        put(sh, sh.getLastRow() + 1, [Utilities.getUuid(), text(p.body, 3000), Date.now(), name, p.person, "隨緣"]);
+        return;
+      }
       if (!me) throw appError("invalid", "請先登入再留言");
       if (person(p.person) === me) throw appError("invalid", "不能留言給自己");
       const sh = tab(ss, "留言");
@@ -409,8 +424,8 @@ function applyWrite(ss, p, me) {
     case "deleteNote": {
       const sh = tab(ss, "留言"), row = findRow(sh, String(p.id));
       if (!row) return;
-      const r = sh.getRange(row, 1, 1, 5).getValues()[0];
-      if (!canSeeNote({ role: String(r[3]), person: String(r[4]) || ADMIN }, me)) throw appError("invalid", "只能刪除自己的留言");
+      const r = sh.getRange(row, 1, 1, 6).getValues()[0];
+      if (!canSeeNote({ role: String(r[3]), person: String(r[4]) || ADMIN, open: String(r[5]) === "隨緣" }, me)) throw appError("invalid", "只能刪除自己的留言");
       sh.deleteRow(row);
       return;
     }

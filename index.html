@@ -214,6 +214,7 @@ textarea.short { min-height: 76px; }
   <div class="wrap" role="tablist">
     <button class="tab" role="tab" id="tab-checkin" data-view="checkin" type="button">每日打卡</button>
     <button class="tab" role="tab" id="tab-overview" data-view="overview" type="button">打卡紀錄</button>
+    <button class="tab" role="tab" id="tab-open" data-view="open" type="button">隨緣驅魔師留言板</button>
     <button class="tab" role="tab" id="tab-journal" data-view="journal" type="button">驅魔勇士心路歷程</button>
     <button class="tab" role="tab" id="tab-notes" data-view="notes" type="button">驅魔師留言板</button>
     <button class="tab" role="tab" id="tab-board" data-view="board" type="button">公佈欄</button>
@@ -233,6 +234,7 @@ textarea.short { min-height: 76px; }
     </div>
     <button class="primary" type="submit">登入</button>
   </form>
+  <p class="who" id="guest-bar" hidden><button class="link" id="show-login" type="button">登入</button></p>
   <p class="who" id="who-bar" hidden><span id="who-name"></span><button class="link" id="logout" type="button">登出</button></p>
   <div class="people" id="people" role="group" aria-label="驅魔勇士"></div>
 
@@ -272,6 +274,19 @@ textarea.short { min-height: 76px; }
       <div class="table-wrap" id="matrix"></div>
       <p class="muted">✓ 完成　✕ 隔天中午 12 點前未打卡　休 休息　- 還沒到</p>
     </div>
+  </section>
+
+  <section class="panel" id="view-open" role="tabpanel" aria-labelledby="tab-open" hidden>
+    <p class="notice">請不帶任何情緒的留言</p>
+    <p class="muted">不用登入，任何人都可以留言給驅魔勇士。留言會在每月 15 號和 30 號公布到「公佈欄」，登入的人都看得到內容和你填的名字。</p>
+    <form id="open-form">
+      <h2 id="open-heading">留下一則留言</h2>
+      <label class="field">你的名字<input type="text" id="open-name" maxlength="20" autocomplete="name" required></label>
+      <label class="field">留言內容
+        <textarea id="open-body" maxlength="3000" required placeholder="這段時間你看到了什麼變化？&#10;留言前請確認已流動情緒"></textarea>
+      </label>
+      <button class="primary" type="submit" id="open-submit">送出留言</button>
+    </form>
   </section>
 
   <section class="panel" id="view-journal" role="tabpanel" aria-labelledby="tab-journal" hidden>
@@ -417,7 +432,7 @@ textarea.short { min-height: 76px; }
 (() => {
   const $ = (id) => document.getElementById(id);
   const WEEK = ["日", "一", "二", "三", "四", "五", "六"];
-  const VIEWS = ["checkin", "overview", "journal", "notes", "board", "rules"];
+  const VIEWS = ["checkin", "overview", "open", "journal", "notes", "board", "rules"];
   /* the experimenter list lives in the config; the first person is the admin and people who joined later count from their join day */
   const DEFAULT_PEOPLE = [{ name: "邱子芸", joined: null }, { name: "江宇熙", joined: null }, { name: "邱家瑋", joined: "2026-11-09" }];
   let PEOPLE, JOINED;
@@ -650,9 +665,16 @@ textarea.short { min-height: 76px; }
     else if (t > lastDay()) count.append(h("b", null, `${S.cfg.days} 天`), "實驗已結束");
     else count.append(h("b", null, `第 ${dayNo(t)} 天`), `共 ${S.cfg.days} 天`);
   }
+  /* signed out, only the records and the open notes board are shown */
+  const PUBLIC_VIEWS = ["overview", "open"];
   function renderTabs() {
+    if (!S.me && !PUBLIC_VIEWS.includes(S.view)) {
+      S.view = "overview";
+      try { history.replaceState(null, "", "#overview"); } catch (e) { /* the hash stays as it was */ }
+    }
     for (const v of VIEWS) {
       const tab = $("tab-" + v), on = S.view === v;
+      tab.hidden = !S.me && !PUBLIC_VIEWS.includes(v);
       tab.setAttribute("aria-selected", String(on));
       $("view-" + v).hidden = !on;
     }
@@ -728,6 +750,7 @@ textarea.short { min-height: 76px; }
       h("ol", { class: "entries" }, l.map((n) => h("li", { class: "entry" },
         h("div", { class: "meta" },
           h("b", null, n.role && n.role !== "observer" && n.role !== "experimenter" ? n.role : "驅魔師"),
+          n.open ? h("span", { class: "pill" }, "隨緣") : null,
           n.createdAt ? h("span", null, stamp(n.createdAt)) : null),
         h("p", { class: "text" }, n.body)))))));
     empty.hidden = groups.length > 0;
@@ -743,10 +766,11 @@ textarea.short { min-height: 76px; }
       menu.replaceChildren(h("option", { value: "" }, "請選擇姓名"), ...names.map((n) => h("option", null, n)));
       menu.value = names.includes(chosen) ? chosen : "";
     }
-    $("login-form").hidden = !gated || !!S.me;
-    $("who-bar").hidden = !gated || !S.me;
+    $("login-form").hidden = !(gated || S.wantLogin) || !!S.me;
+    $("who-bar").hidden = !S.me;
+    $("guest-bar").hidden = !!S.me || gated || !!S.wantLogin;
     $("who-name").textContent = `已登入：${S.me}`;
-    $("login-hint").textContent = S.view === "journal" ? "心路歷程只有本人能寫和看，請先登入。" : S.view === "board" ? "公佈欄要先登入才能看。" : S.view === "notes" ? "留言要先登入。留言會在每月 15 號和 30 號公布到公佈欄。" : "規則大家都可以看，邱子芸登入後可以修改；定課菜單由驅魔勇士本人登入後選。";
+    $("login-hint").textContent = !gated ? "登入後可以打卡，也能看心路歷程、驅魔師留言板、公佈欄和規則。" : S.view === "journal" ? "心路歷程只有本人能寫和看，請先登入。" : S.view === "board" ? "公佈欄要先登入才能看。" : S.view === "notes" ? "留言要先登入。留言會在每月 15 號和 30 號公布到公佈欄。" : "規則大家都可以看，邱子芸登入後可以修改；定課菜單由驅魔勇士本人登入後選。";
     bar.hidden = S.view === "rules" || S.view === "journal" || S.view === "board" || (S.view === "notes" && !S.me);
     bar.replaceChildren(...buttons(notes ? S.me : null));
     $("rest-people").replaceChildren(...buttons());
@@ -968,6 +992,15 @@ textarea.short { min-height: 76px; }
     empty.hidden = !S.loaded || list.length > 0;
     empty.textContent = "還沒有紀錄。用上方表單寫下第一篇。";
   }
+  function renderOpen() {
+    $("open-heading").textContent = `留言給 ${S.person}`;
+    const nameIn = $("open-name");
+    if (!nameIn.value && document.activeElement !== nameIn) {
+      let saved = "";
+      try { saved = localStorage.getItem("noteName") || ""; } catch (e) { /* typed each time instead */ }
+      nameIn.value = saved || S.me || "";
+    }
+  }
   function renderNotes() {
     /* everyone signed in may leave notes, warriors only for the other warriors; each note stays private to its writer */
     $("note-form").hidden = !S.me;
@@ -992,7 +1025,7 @@ textarea.short { min-height: 76px; }
   function render() {
     syncPeople();
     clampSel();
-    renderHeader(); renderTabs(); renderPeople(); renderToday(); renderOverview(); renderRules(); renderObservers(); renderJournal(); renderNotes(); renderBoard();
+    renderHeader(); renderTabs(); renderPeople(); renderToday(); renderOverview(); renderRules(); renderObservers(); renderJournal(); renderNotes(); renderBoard(); renderOpen();
   }
 
   /* ---- actions ---- */
@@ -1137,7 +1170,7 @@ textarea.short { min-height: 76px; }
     const v = location.hash.slice(1);
     S.view = VIEWS.includes(v) ? v : "checkin";
     if (S.view !== "board") S.vowed = false; /* leaving the board means reading it again next time */
-    renderTabs(); renderPeople(); renderNotes(); renderBoard();
+    renderTabs(); renderPeople(); renderNotes(); renderBoard(); renderOpen();
   }
   window.addEventListener("hashchange", routeFromHash);
   $("vow-ok").addEventListener("click", () => { S.vowed = true; $("vow").close(); renderBoard(); });
@@ -1182,12 +1215,14 @@ textarea.short { min-height: 76px; }
       setAuth(d.session);
       $("login-pass").value = "";
       applyData(d.data);
+      S.wantLogin = false;
       if (PEOPLE.includes(S.me)) pickPerson(S.me);
       toast(`${S.me}，已登入`);
     } catch (err) {
       toast(err.code === "invalid" ? err.message : "登入失敗，請檢查網路後再試一次。");
     }
   });
+  $("show-login").addEventListener("click", () => { S.wantLogin = true; renderPeople(); $("login-name").focus(); });
   $("logout").addEventListener("click", () => {
     try { localStorage.removeItem(CACHE_KEY); } catch (e) { /* nothing kept */ }
     setAuth(null); S.notes = []; S.board = []; S.journal = []; S.hasPassword = []; lastRaw = ""; writes++;
@@ -1265,6 +1300,19 @@ textarea.short { min-height: 76px; }
     const ok = await write("saveJournal", { id: S.editing, date, body: sheetSafe(body) });
     submit.disabled = false;
     if (ok) { resetJournal(); toast("已儲存紀錄"); }
+  });
+  $("open-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const name = $("open-name").value.trim(), body = $("open-body").value.trim(), to = S.person;
+    if (!name) { toast("請填寫你的名字。"); $("open-name").focus(); return; }
+    if (!body) return;
+    if (name === to) { toast("不能留言給自己。"); return; }
+    try { localStorage.setItem("noteName", name); } catch (e) { /* remembering is optional */ }
+    const submit = $("open-submit");
+    submit.disabled = true;
+    const ok = await write("addNote", { open: true, person: to, name: sheetSafe(name), body: sheetSafe(body) });
+    submit.disabled = false;
+    if (ok) { $("open-body").value = ""; toast(`留言已送出給 ${to}`); }
   });
   $("note-form").addEventListener("submit", async (e) => {
     e.preventDefault();
