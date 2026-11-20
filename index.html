@@ -16,6 +16,7 @@
   --bg: #EEF0EA; --surface: #F9FAF6; --ink: #1D2A2A; --muted: #566462; --line: #CBD2C9;
   --cinnabar: #B92B1B; --on-cinnabar: #FFF6EC;
   --talisman: #EFC94C; --talisman-soft: #F6E4A2; --on-talisman: #2A2108; --title: #A5220F;
+  --boss-bg: #1D2A2A; --boss-ink: #F9FAF6; --boss-accent: #EFC94C;
   --display: "Noto Serif TC", "Songti TC", "PMingLiU", serif;
   --body: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
   --hand: "LXGW WenKai TC", "Kaiti TC", "DFKai-SB", serif;
@@ -26,6 +27,7 @@
     --bg: #131A1B; --surface: #1B2425; --ink: #E7EAE3; --muted: #A0ADA9; --line: #35423F;
     --cinnabar: #E8604A; --on-cinnabar: #1F0A06;
     --talisman: #3A2F10; --talisman-soft: #4C3E14; --on-talisman: #F3D777; --title: #F3C84B;
+    --boss-bg: #3A1712; --boss-ink: #F6ECE2; --boss-accent: #F3C84B;
     color-scheme: dark;
   }
 }
@@ -33,6 +35,7 @@
   --bg: #131A1B; --surface: #1B2425; --ink: #E7EAE3; --muted: #A0ADA9; --line: #35423F;
   --cinnabar: #E8604A; --on-cinnabar: #1F0A06;
   --talisman: #3A2F10; --talisman-soft: #4C3E14; --on-talisman: #F3D777; --title: #F3C84B;
+  --boss-bg: #3A1712; --boss-ink: #F6ECE2; --boss-accent: #F3C84B;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -102,6 +105,16 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 .prac.special.invite { border-style: dashed; box-shadow: none; }
 .prac.special.invite .seal { color: var(--cinnabar); font-family: var(--display); font-weight: 900; font-size: 24px; }
 .prac.special.locked, .prac.special.closed { background: linear-gradient(135deg, var(--talisman-soft), var(--talisman)); color: var(--on-talisman); }
+/* last week's least-done practice, pulled out of the grid so it cannot be skipped */
+.prac.boss, .prac.boss.locked, .prac.boss.closed { min-height: 96px; padding: 16px 20px; gap: 18px; background: var(--boss-bg); color: var(--boss-ink); border: 2px solid var(--cinnabar); }
+.prac.boss .seal { width: 50px; height: 50px; font-size: 28px; border: 2px dashed var(--boss-accent); }
+.prac.boss[aria-checked="true"] .seal { background: var(--boss-accent); color: var(--boss-bg); border: 0; }
+.prac.boss .prac-text b, .prac.boss[aria-checked="true"] .prac-text b { font-family: var(--display); font-weight: 900; font-size: 21px; line-height: 1.35; letter-spacing: .06em; color: var(--boss-ink); }
+.prac.boss .prac-text small { color: var(--boss-ink); opacity: .85; }
+.prac.boss .boss-tag { margin-bottom: 4px; font-size: 12px; font-weight: 700; letter-spacing: .3em; color: var(--boss-accent); opacity: 1; }
+.prac.boss.clear { border-style: dashed; }
+.prac.boss.clear .seal { color: var(--boss-accent); font-family: var(--display); font-weight: 900; font-size: 24px; }
+@media (max-width: 559px) { .prac.boss { padding: 12px 14px; gap: 12px; } .prac.boss .seal { width: 42px; height: 42px; font-size: 24px; } .prac.boss .prac-text b { font-size: 19px; } }
 .special-list { display: grid; gap: 12px; }
 .special-box { display: grid; gap: 10px; padding: 14px 16px; background: var(--talisman-soft); color: var(--on-talisman); border: 1px solid var(--cinnabar); border-radius: 4px; }
 .special-box h3 { margin: 0; font-size: 16px; color: var(--ink); }
@@ -482,6 +495,21 @@ textarea.short { min-height: 76px; }
   const lastDay = () => addDays(S.cfg.startDate, S.cfg.days - 1);
   const lastElapsed = () => { const t = today(), e = lastDay(); return t < e ? t : e; };
   const started = () => !!S.cfg && today() >= S.cfg.startDate;
+  /* the practice done least last week (Sunday to Saturday, the week before the chosen day); ties go to the lower rate, then list order */
+  function bossOf(date, list) {
+    if (!S.cfg) return null;
+    const start = addDays(date, -weekdayOf(date) - 7), days = [];
+    for (let i = 0; i < 7; i++) { const d = addDays(start, i); if (d >= firstDay() && d <= lastDay()) days.push(d); }
+    let best = null;
+    for (const p of list) {
+      const due = days.filter((d) => applies(p, d) && !restReason(d));
+      if (!due.length) continue;
+      const done = due.filter((d) => doneMap(d)[p.id]).length;
+      if (!best || done < best.done || (done === best.done && done / due.length < best.done / best.due)) best = { p, done, due: due.length };
+    }
+    if (best && best.done === best.due) best.clear = true; /* every practice done every day: no boss this week */
+    return best;
+  }
   const firstDay = () => [S.cfg.startDate, JOINED[S.person]].filter(Boolean).sort().pop();
   /* p.by[name] = { from, to } narrows a practice for one person; no entry means the shared addedOn / removedOn apply */
   const NEVER = "2000-01-01";
@@ -819,23 +847,30 @@ textarea.short { min-height: 76px; }
     const pracButton = (p) => {
       const locked = !!saved[p.id], isDone = !!picked[p.id];
       return h("button", {
-        class: "prac" + (p.special ? " special" : "") + (locked ? " locked" : closed ? " closed" : S.justStamped === p.id && isDone ? " stamp" : ""),
+        class: "prac" + (p.special ? " special" : "") + (boss && boss.p === p ? " boss" : "") + (locked ? " locked" : closed ? " closed" : S.justStamped === p.id && isDone ? " stamp" : ""),
         type: "button", role: "checkbox", "aria-checked": String(isDone), "data-pid": p.id,
         disabled: locked || closed, on: { click: () => toggle(p.id) },
       },
         h("span", { class: "seal", "aria-hidden": "true" }, "✓"),
-        h("span", { class: "prac-text" }, p.special ? h("small", { class: "special-tag" }, "✦ 驅魔師C圈訂制 ✦") : null, h("b", null, p.name), p.note ? h("small", null, p.note) : null, locked ? h("small", null, "已打卡") : null));
+        h("span", { class: "prac-text" }, p.special ? h("small", { class: "special-tag" }, "✦ 驅魔師C圈訂制 ✦") : null,
+          boss && boss.p === p ? h("small", { class: "boss-tag" }, "⚔ 不要逃避大魔王 ⚔") : null, h("b", null, p.name),
+          boss && boss.p === p ? h("small", null, `上禮拜只完成 ${boss.done} / ${boss.due} 天`) : null, p.note ? h("small", null, p.note) : null, locked ? h("small", null, "已打卡") : null));
     };
     /* keep the usual grouping order, then split it evenly so neither column runs long */
-    const special = list.filter((p) => p.special), plain = list.filter((p) => !p.special);
+    const special = list.filter((p) => p.special), boss = bossOf(sel, list.filter((p) => !p.special));
+    const plain = list.filter((p) => !p.special && !(boss && !boss.clear && boss.p === p));
     /* without one yet, the same spot invites the person to ask the C circle for it */
-    g.append(h("div", { class: "group" }, special.length ? special.map(pracButton) : h("div", { class: "prac special invite" },
+    g.append(h("div", { class: "group" }, special.length ? special.map((p) => pracButton(p)) : h("div", { class: "prac special invite" },
       h("span", { class: "seal", "aria-hidden": "true" }, "訂"),
       h("span", { class: "prac-text" }, h("small", { class: "special-tag" }, "✦ 驅魔師C圈訂制 ✦"), h("b", null, "驅魔必殺技"),
         h("small", null, "想要快速驅魔嗎？快來開箱 找驅魔師為你量身訂製吧！")))));
+    if (boss) g.append(h("div", { class: "group" }, !boss.clear ? pracButton(boss.p) : h("div", { class: "prac boss clear" },
+      h("span", { class: "seal", "aria-hidden": "true" }, "勝"),
+      h("span", { class: "prac-text" }, h("small", { class: "boss-tag" }, "⚔ 不要逃避大魔王 ⚔"), h("b", null, "大魔王不敢出現"),
+        h("small", null, "上禮拜的定課全部完成，繼續保持！")))));
     const ordered = [...plain.filter((p) => LEFT_PRACTICES.test(p.name)), ...plain.filter((p) => !LEFT_PRACTICES.test(p.name))];
     const rows = Math.ceil(ordered.length / 2), leftCol = ordered.slice(0, rows), rightCol = ordered.slice(rows);
-    const column = (items) => h("div", { class: "prac-col", style: `--rows: ${rows}` }, items.map(pracButton));
+    const column = (items) => h("div", { class: "prac-col", style: `--rows: ${rows}` }, items.map((p) => pracButton(p)));
     g.append(h("div", { class: "pracs" }, column(leftCol), column(rightCol)));
     const changed = !sameDone(picked, saved);
     if (!closed) g.append(h("div", { class: "actions submit-row" },
