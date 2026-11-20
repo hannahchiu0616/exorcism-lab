@@ -16,7 +16,7 @@
   --bg: #EEF0EA; --surface: #F9FAF6; --ink: #1D2A2A; --muted: #566462; --line: #CBD2C9;
   --cinnabar: #B92B1B; --on-cinnabar: #FFF6EC;
   --talisman: #EFC94C; --talisman-soft: #F6E4A2; --on-talisman: #2A2108; --title: #A5220F;
-  --boss-bg: #1D2A2A; --boss-ink: #F9FAF6; --boss-accent: #EFC94C;
+  --boss-bg: #B92B1B; --boss-ink: #FFF6EC; --boss-accent: #F6E4A2; --boss-line: #7A160C;
   --display: "Noto Serif TC", "Songti TC", "PMingLiU", serif;
   --body: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
   --hand: "LXGW WenKai TC", "Kaiti TC", "DFKai-SB", serif;
@@ -27,7 +27,7 @@
     --bg: #131A1B; --surface: #1B2425; --ink: #E7EAE3; --muted: #A0ADA9; --line: #35423F;
     --cinnabar: #E8604A; --on-cinnabar: #1F0A06;
     --talisman: #3A2F10; --talisman-soft: #4C3E14; --on-talisman: #F3D777; --title: #F3C84B;
-    --boss-bg: #3A1712; --boss-ink: #F6ECE2; --boss-accent: #F3C84B;
+    --boss-bg: #7A2216; --boss-ink: #FBEDE4; --boss-accent: #F3C84B; --boss-line: #E8604A;
     color-scheme: dark;
   }
 }
@@ -35,7 +35,7 @@
   --bg: #131A1B; --surface: #1B2425; --ink: #E7EAE3; --muted: #A0ADA9; --line: #35423F;
   --cinnabar: #E8604A; --on-cinnabar: #1F0A06;
   --talisman: #3A2F10; --talisman-soft: #4C3E14; --on-talisman: #F3D777; --title: #F3C84B;
-  --boss-bg: #3A1712; --boss-ink: #F6ECE2; --boss-accent: #F3C84B;
+  --boss-bg: #7A2216; --boss-ink: #FBEDE4; --boss-accent: #F3C84B; --boss-line: #E8604A;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -106,7 +106,7 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 .prac.special.invite .seal { color: var(--cinnabar); font-family: var(--display); font-weight: 900; font-size: 24px; }
 .prac.special.locked, .prac.special.closed { background: linear-gradient(135deg, var(--talisman-soft), var(--talisman)); color: var(--on-talisman); }
 /* last week's least-done practice, pulled out of the grid so it cannot be skipped */
-.prac.boss, .prac.boss.locked, .prac.boss.closed { min-height: 96px; padding: 16px 20px; gap: 18px; background: var(--boss-bg); color: var(--boss-ink); border: 2px solid var(--cinnabar); }
+.prac.boss, .prac.boss.locked, .prac.boss.closed { min-height: 96px; padding: 16px 20px; gap: 18px; background: var(--boss-bg); color: var(--boss-ink); border: 2px solid var(--boss-line); box-shadow: inset 0 0 0 3px var(--boss-bg), inset 0 0 0 4px var(--boss-accent); }
 .prac.boss .seal { width: 50px; height: 50px; font-size: 28px; border: 2px dashed var(--boss-accent); }
 .prac.boss[aria-checked="true"] .seal { background: var(--boss-accent); color: var(--boss-bg); border: 0; }
 .prac.boss .prac-text b, .prac.boss[aria-checked="true"] .prac-text b { font-family: var(--display); font-weight: 900; font-size: 21px; line-height: 1.35; letter-spacing: .06em; color: var(--boss-ink); }
