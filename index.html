@@ -112,6 +112,22 @@ h2 { margin: 0; font-size: 16px; font-weight: 700; }
 .prac.boss .prac-text b, .prac.boss[aria-checked="true"] .prac-text b { font-family: var(--display); font-weight: 900; font-size: 21px; line-height: 1.35; letter-spacing: .06em; color: var(--boss-ink); }
 .prac.boss .prac-text small { color: var(--boss-ink); opacity: .85; }
 .prac.boss .boss-tag { margin-bottom: 4px; font-size: 12px; font-weight: 700; letter-spacing: .3em; color: var(--boss-accent); opacity: 1; }
+/* an unbeaten boss glows, shines and nudges to be tapped; once checked it stands still */
+.prac.boss { position: relative; overflow: hidden; transition: transform .15s ease; }
+.prac.boss:not([aria-checked="true"]):not(:disabled) { animation: boss-glow 2.4s ease-in-out infinite; }
+.prac.boss:not([aria-checked="true"]):not(:disabled)::after { content: ""; position: absolute; inset: 0; background: linear-gradient(105deg, transparent 35%, rgba(255, 246, 236, .35) 50%, transparent 65%); transform: translateX(-120%); animation: boss-shine 3.6s ease-in-out infinite; pointer-events: none; }
+.prac.boss:not(:disabled):hover { transform: translateY(-2px); }
+.prac.boss:not(:disabled):active { transform: scale(.98); }
+.prac.boss .boss-cta { margin-top: 6px; font-size: 14px; font-weight: 700; letter-spacing: .05em; color: var(--boss-accent); opacity: 1; }
+.prac.boss .boss-cta i { display: inline-block; font-style: normal; animation: boss-nudge 1.2s ease-in-out infinite; }
+.prac.boss[aria-checked="true"] .boss-cta i, .prac.boss:disabled .boss-cta i { animation: none; }
+@keyframes boss-glow {
+  0%, 100% { box-shadow: inset 0 0 0 3px var(--boss-bg), inset 0 0 0 4px var(--boss-accent), 0 0 0 0 rgba(185, 43, 27, .55); }
+  50% { box-shadow: inset 0 0 0 3px var(--boss-bg), inset 0 0 0 4px var(--boss-accent), 0 0 0 9px rgba(185, 43, 27, 0), 0 6px 22px rgba(185, 43, 27, .45); }
+}
+@keyframes boss-shine { 0%, 55% { transform: translateX(-120%); } 85%, 100% { transform: translateX(120%); } }
+@keyframes boss-nudge { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(5px); } }
+@media (prefers-reduced-motion: reduce) { .prac.boss, .prac.boss::after, .prac.boss .boss-cta i { animation: none !important; } }
 .prac.boss.clear { border-style: dashed; }
 .prac.boss.clear .seal { color: var(--boss-accent); font-family: var(--display); font-weight: 900; font-size: 24px; }
 @media (max-width: 559px) { .prac.boss { padding: 12px 14px; gap: 12px; } .prac.boss .seal { width: 42px; height: 42px; font-size: 24px; } .prac.boss .prac-text b { font-size: 19px; } }
@@ -854,7 +870,7 @@ textarea.short { min-height: 76px; }
         h("span", { class: "seal", "aria-hidden": "true" }, "✓"),
         h("span", { class: "prac-text" }, p.special ? h("small", { class: "special-tag" }, "✦ 驅魔師C圈訂制 ✦") : null,
           boss && boss.p === p ? h("small", { class: "boss-tag" }, "⚔ 不要逃避大魔王 ⚔") : null, h("b", null, p.name),
-          boss && boss.p === p ? h("small", null, `上禮拜只完成 ${boss.done} / ${boss.due} 天`) : null, p.note ? h("small", null, p.note) : null, locked ? h("small", null, "已打卡") : null));
+          boss && boss.p === p ? h("small", { class: "boss-cta" }, isDone || locked ? "✓ 今天已打倒大魔王！" : closed ? "這天沒打倒，下次別再逃避" : h("span", null, "點我，今天就打倒它 ", h("i", null, "›"))) : null, p.note ? h("small", null, p.note) : null, locked ? h("small", null, "已打卡") : null));
     };
     /* keep the usual grouping order, then split it evenly so neither column runs long */
     const special = list.filter((p) => p.special), boss = bossOf(sel, list.filter((p) => !p.special));
